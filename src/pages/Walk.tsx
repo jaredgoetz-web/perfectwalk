@@ -237,6 +237,21 @@ const Walk = () => {
               </div>
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
             </motion.button>
+
+            {/* Create new playlist link */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.25 }}
+              className="flex justify-center pt-2"
+            >
+              <button
+                onClick={() => navigate("/playlists")}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                + Create New Playlist
+              </button>
+            </motion.div>
           </div>
         </div>
       </div>
