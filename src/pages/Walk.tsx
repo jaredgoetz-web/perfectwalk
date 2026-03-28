@@ -1,11 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import heartBg from "@/assets/phase-heart-bg.jpg";
-import { Play, Pause, SkipForward, Check, X } from "lucide-react";
+import { Play, Pause, SkipForward, Check, X, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import WalkPhaseCard, { walkPhases } from "@/components/WalkPhaseCard";
 import { saveWalkEntry, WalkEntry } from "@/lib/walkStore";
+
+// Map phase index to audio file (add more as you upload them)
+const phaseAudio: Record<number, string> = {
+  0: "/audio/phase-1-heart.mp3",
+};
 
 const Walk = () => {
   const navigate = useNavigate();
@@ -13,6 +18,7 @@ const Walk = () => {
   const [currentPhase, setCurrentPhase] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [completedPhases, setCompletedPhases] = useState<number[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
