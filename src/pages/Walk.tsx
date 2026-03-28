@@ -10,6 +10,7 @@ import { saveWalkEntry, WalkEntry } from "@/lib/walkStore";
 // Map phase index to audio file (add more as you upload them)
 const phaseAudio: Record<number, string> = {
   0: "/audio/phase-1-heart.mp3",
+  4: "/audio/phase-5-celebrate.mp3",
 };
 
 const Walk = () => {
