@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Play, Flame, Clock, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import walkSilhouette from "@/assets/walk-silhouette-color.png";
+import brandingImage from "@/assets/branding.jpg";
 import { getStreak, getTotalWalks, getTotalMinutes } from "@/lib/walkStore";
 
 const Index = () => {
