@@ -30,6 +30,7 @@ const JournalNew = () => {
   const [prompt] = useState(() => prompts[Math.floor(Math.random() * prompts.length)]);
   const [isRecording, setIsRecording] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const baseTextRef = useRef("");
 
   const startRecording = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -38,28 +39,28 @@ const JournalNew = () => {
       return;
     }
 
+    // Save whatever text exists before recording starts
+    baseTextRef.current = journal;
+
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = "en-US";
 
-    let finalTranscript = "";
-
     recognition.onresult = (event: any) => {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      let finalTranscript = "";
+      let interimTranscript = "";
+      for (let i = 0; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          finalTranscript += transcript + " ";
+          finalTranscript += transcript;
         } else {
-          interim = transcript;
+          interimTranscript += transcript;
         }
       }
-      setJournal((prev) => {
-        const base = prev.endsWith(" ") ? prev : prev ? prev + " " : "";
-        return base + finalTranscript + interim;
-      });
-      finalTranscript = "";
+      const base = baseTextRef.current;
+      const separator = base && !base.endsWith(" ") ? " " : "";
+      setJournal(base + separator + finalTranscript + interimTranscript);
     };
 
     recognition.onerror = () => setIsRecording(false);
@@ -68,7 +69,7 @@ const JournalNew = () => {
     recognition.start();
     recognitionRef.current = recognition;
     setIsRecording(true);
-  }, []);
+  }, [journal]);
 
   const stopRecording = useCallback(() => {
     recognitionRef.current?.stop();
