@@ -145,10 +145,36 @@ const JournalNew = () => {
             placeholder="Share your experience..."
             className="mt-3 min-h-[140px] resize-none rounded-xl border-border bg-card text-foreground"
           />
-        </div>
-
-        {/* Save */}
-        <div className="mt-8 flex gap-3">
+          <Button
+            type="button"
+            variant={isRecording ? "destructive" : "outline"}
+            onClick={isRecording ? stopRecording : startRecording}
+            className={`mt-3 w-full gap-2 rounded-full ${isRecording ? "" : "border-primary/30 text-primary hover:bg-primary/10"}`}
+          >
+            {isRecording ? (
+              <>
+                <MicOff className="h-4 w-4" />
+                Stop Recording
+              </>
+            ) : (
+              <>
+                <Mic className="h-4 w-4" />
+                Capture My Experience
+              </>
+            )}
+          </Button>
+          <AnimatePresence>
+            {isRecording && (
+              <motion.p
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-2 text-center text-xs text-muted-foreground"
+              >
+                🎙️ Listening… speak freely and your words will appear above
+              </motion.p>
+            )}
+          </AnimatePresence>
           <Button
             variant="outline"
             onClick={() => navigate("/journal")}
