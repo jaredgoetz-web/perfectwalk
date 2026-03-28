@@ -46,16 +46,19 @@ const Walk = () => {
   // Spotify state
   const [spotifyConnected, setSpotifyConnected] = useState(isSpotifyLoggedIn());
   const [spotifyName, setSpotifyName] = useState<string | null>(null);
-  const [spotifyIsPremium, setSpotifyIsPremium] = useState(false);
+  const [spotifyPlan, setSpotifyPlan] = useState<"checking" | "premium" | "free">(
+    isSpotifyLoggedIn() ? "checking" : "free"
+  );
   const spotify = useSpotifyPlayer();
 
   // Fetch Spotify profile on mount
   useEffect(() => {
     if (spotifyConnected) {
+      setSpotifyPlan("checking");
       fetchSpotifyProfile().then((profile) => {
         if (profile) {
           setSpotifyName(profile.display_name);
-          setSpotifyIsPremium(profile.product === "premium");
+          setSpotifyPlan(profile.product === "premium" ? "premium" : "free");
         }
       });
     }
