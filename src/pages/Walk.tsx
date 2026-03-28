@@ -370,18 +370,24 @@ const Walk = () => {
         )}
       </div>
 
-      {/* Now playing info */}
-      {phaseAudio[currentPhase] && (
+      {/* Now playing info / Spotify embed */}
+      {currentMedia && (
         <div className="mx-auto mt-6 max-w-lg px-5">
-          <div className="flex items-center gap-2 rounded-xl bg-card px-4 py-3 shadow-warm">
-            <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-            <p className="text-sm text-muted-foreground">
-              Now playing:{" "}
-              <span className="font-semibold text-foreground">
-                {songLibrary.find((s) => s.audioSrc === phaseAudio[currentPhase])?.title || "Unknown"}
-              </span>
-            </p>
-          </div>
+          {currentMedia.type === "spotify" && currentMedia.spotifyTrackId ? (
+            <div className="rounded-xl overflow-hidden shadow-warm">
+              <SpotifyEmbed trackId={currentMedia.spotifyTrackId} compact={false} />
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-xl bg-card px-4 py-3 shadow-warm">
+              <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+              <p className="text-sm text-muted-foreground">
+                Now playing:{" "}
+                <span className="font-semibold text-foreground">
+                  {currentMedia.title}
+                </span>
+              </p>
+            </div>
+          )}
         </div>
       )}
 
