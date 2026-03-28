@@ -22,7 +22,7 @@ const Index = () => {
       {/* Hero */}
       <div className="relative h-[55vh] overflow-hidden">
         <img
-          src={heroImage}
+          src={brandingImage}
           alt="Sunrise walking path"
           className="h-full w-full object-cover"
           width={1920}
