@@ -269,7 +269,11 @@ const Walk = () => {
                     {spotifyName && <span className="text-muted-foreground"> · {spotifyName}</span>}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {spotifyIsPremium ? "Premium · Full tracks enabled" : "Free tier · 30s previews only"}
+                    {spotifyPlan === "checking"
+                      ? "Checking account status…"
+                      : spotifyPlan === "premium"
+                        ? "Premium · Full tracks enabled"
+                        : "Free tier · 30s previews only"}
                   </p>
                 </div>
                 <button onClick={handleSpotifyDisconnect} className="p-1.5 rounded-full hover:bg-secondary text-muted-foreground">
