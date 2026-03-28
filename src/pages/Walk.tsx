@@ -6,13 +6,29 @@ import { Play, Pause, SkipForward, Check, X, ListMusic, Sparkles, ChevronRight }
 import { Button } from "@/components/ui/button";
 import WalkPhaseCard, { walkPhases } from "@/components/WalkPhaseCard";
 import { saveWalkEntry, WalkEntry } from "@/lib/walkStore";
+import SpotifyEmbed from "@/components/SpotifyEmbed";
 import {
   songLibrary,
   getSongsByPhase,
   loadPlaylists,
+  loadUserSongs,
   CustomPlaylist,
   Song,
 } from "@/lib/songLibrary";
+
+interface PhaseMedia {
+  type: "audio" | "spotify";
+  audioSrc?: string;
+  spotifyTrackId?: string;
+  title: string;
+}
+
+function songToMedia(song: Song): PhaseMedia {
+  if (song.spotifyTrackId) {
+    return { type: "spotify", spotifyTrackId: song.spotifyTrackId, title: song.title };
+  }
+  return { type: "audio", audioSrc: song.audioSrc, title: song.title };
+}
 
 type Screen = "pick" | "walking";
 
@@ -25,42 +41,43 @@ const Walk = () => {
   const [completedPhases, setCompletedPhases] = useState<number[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Selected playlist song map: phaseIndex → audioSrc
-  const [phaseAudio, setPhaseAudio] = useState<Record<number, string>>({});
+  // Selected playlist media map: phaseIndex → PhaseMedia
+  const [phaseMedia, setPhaseMedia] = useState<Record<number, PhaseMedia>>({});
 
-  // Build default audio map (first song per phase)
-  const defaultAudio = useMemo(() => {
-    const map: Record<number, string> = {};
+  // Build default media map (first song per phase)
+  const defaultMedia = useMemo(() => {
+    const map: Record<number, PhaseMedia> = {};
     walkPhases.forEach((phase, idx) => {
       const songs = getSongsByPhase(phase.id);
-      if (songs.length > 0) map[idx] = songs[0].audioSrc;
+      if (songs.length > 0) map[idx] = songToMedia(songs[0]);
     });
     return map;
   }, []);
 
   const myPlaylists = useMemo(() => loadPlaylists(), []);
 
-  const selectPlaylist = (audioMap: Record<number, string>) => {
-    setPhaseAudio(audioMap);
+  const selectPlaylist = (mediaMap: Record<number, PhaseMedia>) => {
+    setPhaseMedia(mediaMap);
     setScreen("walking");
   };
 
-  const selectDefault = () => selectPlaylist(defaultAudio);
+  const selectDefault = () => selectPlaylist(defaultMedia);
 
   const selectCustom = (pl: CustomPlaylist) => {
-    const map: Record<number, string> = {};
+    const allSongs = [...songLibrary, ...loadUserSongs()];
+    const map: Record<number, PhaseMedia> = {};
     pl.songIds.forEach((songId) => {
-      const song = songLibrary.find((s) => s.id === songId);
+      const song = allSongs.find((s) => s.id === songId);
       if (song) {
         const phaseIdx = walkPhases.findIndex((p) => p.id === song.phaseId);
-        if (phaseIdx >= 0) map[phaseIdx] = song.audioSrc;
+        if (phaseIdx >= 0) map[phaseIdx] = songToMedia(song);
       }
     });
     selectPlaylist(map);
   };
 
   const selectNoMusic = () => {
-    setPhaseAudio({});
+    setPhaseMedia({});
     setScreen("walking");
   };
 
@@ -73,14 +90,14 @@ const Walk = () => {
     return () => clearInterval(interval);
   }, [isWalking]);
 
-  // Audio playback
+  // Audio playback (only for non-Spotify tracks)
+  const currentMedia = phaseMedia[currentPhase];
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const src = phaseAudio[currentPhase];
-    if (src) {
-      if (!audio.src.endsWith(src)) {
-        audio.src = src;
+    if (currentMedia?.type === "audio" && currentMedia.audioSrc) {
+      if (!audio.src.endsWith(currentMedia.audioSrc)) {
+        audio.src = currentMedia.audioSrc;
       }
       if (isWalking) {
         audio.play().catch(() => {});
@@ -91,7 +108,7 @@ const Walk = () => {
       audio.pause();
       audio.src = "";
     }
-  }, [isWalking, currentPhase, phaseAudio]);
+  }, [isWalking, currentPhase, currentMedia]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -353,18 +370,24 @@ const Walk = () => {
         )}
       </div>
 
-      {/* Now playing info */}
-      {phaseAudio[currentPhase] && (
+      {/* Now playing info / Spotify embed */}
+      {currentMedia && (
         <div className="mx-auto mt-6 max-w-lg px-5">
-          <div className="flex items-center gap-2 rounded-xl bg-card px-4 py-3 shadow-warm">
-            <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-            <p className="text-sm text-muted-foreground">
-              Now playing:{" "}
-              <span className="font-semibold text-foreground">
-                {songLibrary.find((s) => s.audioSrc === phaseAudio[currentPhase])?.title || "Unknown"}
-              </span>
-            </p>
-          </div>
+          {currentMedia.type === "spotify" && currentMedia.spotifyTrackId ? (
+            <div className="rounded-xl overflow-hidden shadow-warm">
+              <SpotifyEmbed trackId={currentMedia.spotifyTrackId} compact={false} />
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-xl bg-card px-4 py-3 shadow-warm">
+              <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+              <p className="text-sm text-muted-foreground">
+                Now playing:{" "}
+                <span className="font-semibold text-foreground">
+                  {currentMedia.title}
+                </span>
+              </p>
+            </div>
+          )}
         </div>
       )}
 
