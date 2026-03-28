@@ -6,7 +6,8 @@ interface SpotifyEmbedProps {
 const SpotifyEmbed = ({ trackId, compact = true }: SpotifyEmbedProps) => {
   return (
     <iframe
-      src={`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`}
+      key={trackId}
+      src={`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0&autoplay=1`}
       width="100%"
       height={compact ? 80 : 152}
       frameBorder="0"
