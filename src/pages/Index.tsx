@@ -19,46 +19,81 @@ const Index = () => {
   return (
     <div className="min-h-screen pb-24">
       {/* Hero */}
-      <div className="relative flex flex-col items-center justify-center overflow-hidden px-6 pb-12 pt-16"
+      <div className="relative flex flex-col items-center justify-center overflow-hidden px-6 pb-14 pt-16"
         style={{
-          background: "radial-gradient(ellipse at center top, hsl(220 60% 92%) 0%, hsl(260 30% 88%) 30%, hsl(30 30% 97%) 70%)",
+          background: "radial-gradient(ellipse at 20% 0%, hsl(350 50% 85% / 0.5) 0%, transparent 50%), radial-gradient(ellipse at 80% 10%, hsl(220 60% 88% / 0.6) 0%, transparent 45%), radial-gradient(ellipse at 50% 80%, hsl(260 35% 88% / 0.4) 0%, transparent 50%), radial-gradient(ellipse at center, hsl(30 30% 97%) 0%, hsl(30 30% 97%) 100%)",
         }}
       >
+        {/* Soft decorative orbs */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.35 }}
+          transition={{ duration: 2 }}
+          className="pointer-events-none absolute -left-10 top-8 h-32 w-32 rounded-full"
+          style={{ background: "radial-gradient(circle, hsl(350 60% 70% / 0.4), transparent 70%)" }}
+        />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.3 }}
+          transition={{ duration: 2, delay: 0.3 }}
+          className="pointer-events-none absolute -right-8 top-20 h-28 w-28 rounded-full"
+          style={{ background: "radial-gradient(circle, hsl(30 80% 65% / 0.35), transparent 70%)" }}
+        />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.25 }}
+          transition={{ duration: 2, delay: 0.5 }}
+          className="pointer-events-none absolute bottom-16 left-12 h-20 w-20 rounded-full"
+          style={{ background: "radial-gradient(circle, hsl(260 40% 75% / 0.35), transparent 70%)" }}
+        />
+
         {/* Golden ring */}
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1, ease: "easeOut" }}
-          className="relative flex h-48 w-48 items-center justify-center rounded-full"
+          className="relative flex h-52 w-52 items-center justify-center rounded-full shadow-lg"
           style={{
-            background: "linear-gradient(135deg, hsl(38 90% 55%), hsl(32 80% 50%))",
-            padding: "4px",
+            background: "linear-gradient(135deg, hsl(38 90% 55%), hsl(28 85% 50%))",
+            padding: "5px",
           }}
         >
-          <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-white text-center">
-            <span className="font-display text-sm font-medium tracking-widest uppercase" style={{ color: "hsl(220 50% 25%)" }}>
+          <div className="flex h-full w-full flex-col items-center justify-center rounded-full text-center"
+            style={{ background: "radial-gradient(circle at center, white 60%, hsl(220 40% 96%) 100%)" }}
+          >
+            <span className="font-display text-sm font-medium tracking-[0.25em] uppercase" style={{ color: "hsl(220 50% 25%)" }}>
               The
             </span>
-            <span className="font-display text-3xl font-bold leading-none tracking-tight" style={{ color: "hsl(220 50% 20%)" }}>
+            <span className="font-display text-[2.1rem] font-bold leading-none tracking-tight" style={{ color: "hsl(220 55% 18%)" }}>
               Perfect
             </span>
-            <span className="font-display text-3xl font-bold leading-none tracking-tight" style={{ color: "hsl(220 50% 20%)" }}>
+            <span className="font-display text-[2.1rem] font-bold leading-none tracking-tight" style={{ color: "hsl(220 55% 18%)" }}>
               Walk
             </span>
           </div>
         </motion.div>
 
+        {/* Tagline */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.8, delay: 0.4 }}
+          className="mt-5 font-display text-base italic text-muted-foreground"
+        >
+          Open your heart. Transform your morning.
+        </motion.p>
+
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
-          className="mt-8"
+          transition={{ duration: 0.6, delay: 0.6 }}
+          className="mt-6"
         >
           <Button
             size="lg"
             onClick={() => navigate("/walk")}
             className="gap-2 rounded-full px-10 py-6 text-lg font-semibold text-white shadow-warm"
-            style={{ background: "linear-gradient(135deg, hsl(38 90% 55%), hsl(32 80% 50%))" }}
+            style={{ background: "linear-gradient(135deg, hsl(38 90% 55%), hsl(28 85% 50%))" }}
           >
             <Play className="h-5 w-5" />
             Start Your Walk
