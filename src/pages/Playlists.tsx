@@ -19,10 +19,13 @@ import {
   loadPlaylists,
   savePlaylist,
   deletePlaylist,
+  loadUserSongs,
   CustomPlaylist,
   Song,
 } from "@/lib/songLibrary";
 import SongRow from "@/components/SongRow";
+import AddSpotifySong from "@/components/AddSpotifySong";
+import SpotifyEmbed from "@/components/SpotifyEmbed";
 
 type Tab = "explore" | "playlists" | "create";
 
