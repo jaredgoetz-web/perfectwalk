@@ -19,10 +19,13 @@ import {
   loadPlaylists,
   savePlaylist,
   deletePlaylist,
+  
   CustomPlaylist,
   Song,
 } from "@/lib/songLibrary";
 import SongRow from "@/components/SongRow";
+import AddSpotifySong from "@/components/AddSpotifySong";
+import SpotifyEmbed from "@/components/SpotifyEmbed";
 
 type Tab = "explore" | "playlists" | "create";
 
@@ -30,6 +33,7 @@ const Playlists = () => {
   const [tab, setTab] = useState<Tab>("explore");
   const [expandedPhase, setExpandedPhase] = useState<number | null>(null);
   const [playingSongId, setPlayingSongId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Custom playlists
@@ -161,7 +165,7 @@ const Playlists = () => {
             >
               {walkPhases.map((phase) => {
                 const Icon = phase.icon;
-                const songs = getSongsByPhase(phase.id);
+                const songs = getSongsByPhase(phase.id); // refreshKey: {refreshKey} triggers re-render
                 const isExpanded = expandedPhase === phase.id;
 
                 return (
@@ -202,21 +206,29 @@ const Playlists = () => {
                         >
                           <div className="px-2 pb-2">
                             {songs.length > 0 ? (
-                              songs.map((song, i) => (
-                                <SongRow
-                                  key={song.id}
-                                  song={song}
-                                  index={i}
-                                  isPlaying={playingSongId === song.id}
-                                  onPlay={() => togglePlay(song)}
-                                />
-                              ))
+                              songs.map((song, i) =>
+                                song.spotifyTrackId ? (
+                                  <div key={song.id} className="px-3 py-2">
+                                    <p className="font-display text-sm font-semibold text-foreground mb-1">{song.title}</p>
+                                    <SpotifyEmbed trackId={song.spotifyTrackId} />
+                                  </div>
+                                ) : (
+                                  <SongRow
+                                    key={song.id}
+                                    song={song}
+                                    index={i}
+                                    isPlaying={playingSongId === song.id}
+                                    onPlay={() => togglePlay(song)}
+                                  />
+                                )
+                              )
                             ) : (
                               <p className="px-3 py-4 text-sm text-muted-foreground italic">
                                 No songs yet for this phase
                               </p>
                             )}
                           </div>
+                          <AddSpotifySong phaseId={phase.id} onAdded={() => setRefreshKey((k) => k + 1)} />
                         </motion.div>
                       )}
                     </AnimatePresence>

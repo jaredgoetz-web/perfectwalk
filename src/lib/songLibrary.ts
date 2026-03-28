@@ -4,6 +4,34 @@ export interface Song {
   phaseId: number;
   audioSrc: string;
   duration?: string; // e.g. "4:32"
+  spotifyTrackId?: string; // Spotify embed track ID
+}
+
+/** Extract Spotify track ID from a URL like https://open.spotify.com/track/XXXX?si=... */
+export function parseSpotifyUrl(url: string): string | null {
+  const match = url.match(/open\.spotify\.com\/track\/([a-zA-Z0-9]+)/);
+  return match ? match[1] : null;
+}
+
+const USER_SONGS_KEY = "perfectwalk_user_songs";
+
+export function loadUserSongs(): Song[] {
+  try {
+    return JSON.parse(localStorage.getItem(USER_SONGS_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function saveUserSong(song: Song) {
+  const all = loadUserSongs();
+  all.push(song);
+  localStorage.setItem(USER_SONGS_KEY, JSON.stringify(all));
+}
+
+export function deleteUserSong(id: string) {
+  const all = loadUserSongs().filter((s) => s.id !== id);
+  localStorage.setItem(USER_SONGS_KEY, JSON.stringify(all));
 }
 
 export const songLibrary: Song[] = [
@@ -25,7 +53,8 @@ export const songLibrary: Song[] = [
 ];
 
 export function getSongsByPhase(phaseId: number): Song[] {
-  return songLibrary.filter((s) => s.phaseId === phaseId);
+  const userSongs = loadUserSongs();
+  return [...songLibrary, ...userSongs].filter((s) => s.phaseId === phaseId);
 }
 
 export interface CustomPlaylist {
