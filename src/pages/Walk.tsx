@@ -81,7 +81,7 @@ const Walk = () => {
           key={currentPhase}
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className={`flex h-32 w-32 items-center justify-center rounded-full bg-secondary ${phase.color}`}
+          className={`relative z-10 flex h-32 w-32 items-center justify-center rounded-full bg-secondary ${phase.color}`}
         >
           <Icon className="h-14 w-14" />
         </motion.div>
@@ -92,7 +92,7 @@ const Walk = () => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="mt-6 text-center"
+            className="relative z-10 mt-6 text-center"
           >
             <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">
               Phase {phase.id} of 5
@@ -104,7 +104,7 @@ const Walk = () => {
           </motion.div>
         </AnimatePresence>
 
-        <p className="mt-6 font-display text-5xl font-bold tabular-nums text-foreground">
+        <p className="relative z-10 mt-6 font-display text-5xl font-bold tabular-nums text-foreground">
           {formatTime(elapsed)}
         </p>
       </div>
