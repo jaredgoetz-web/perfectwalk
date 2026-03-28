@@ -115,7 +115,7 @@ const Walk = () => {
 
   // Determine if we should use Spotify SDK for current track
   const currentMedia = phaseMedia[currentPhase];
-  const useSDK = spotifyConnected && spotifyIsPremium && spotify.isReady && currentMedia?.type === "spotify";
+  const useSDK = spotifyConnected && spotifyPlan === "premium" && spotify.isReady && currentMedia?.type === "spotify";
 
   // Audio playback (only for non-Spotify or fallback)
   useEffect(() => {
@@ -225,7 +225,7 @@ const Walk = () => {
     spotifyLogout();
     setSpotifyConnected(false);
     setSpotifyName(null);
-    setSpotifyIsPremium(false);
+    setSpotifyPlan("free");
   };
 
   const phase = walkPhases[currentPhase];
