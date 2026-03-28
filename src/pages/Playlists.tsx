@@ -33,6 +33,9 @@ const Playlists = () => {
   const [tab, setTab] = useState<Tab>("explore");
   const [expandedPhase, setExpandedPhase] = useState<number | null>(null);
   const [playingSongId, setPlayingSongId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playingSongId, setPlayingSongId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Custom playlists
