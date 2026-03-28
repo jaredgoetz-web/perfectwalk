@@ -28,6 +28,26 @@ const Walk = () => {
     return () => clearInterval(interval);
   }, [isWalking]);
 
+  // Audio playback
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const src = phaseAudio[currentPhase];
+    if (src) {
+      if (!audio.src.endsWith(src)) {
+        audio.src = src;
+      }
+      if (isWalking) {
+        audio.play().catch(() => {});
+      } else {
+        audio.pause();
+      }
+    } else {
+      audio.pause();
+      audio.src = "";
+    }
+  }, [isWalking, currentPhase]);
+
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
