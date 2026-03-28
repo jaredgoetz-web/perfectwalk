@@ -276,14 +276,14 @@ const Walk = () => {
             ) : (
               <button
                 onClick={handleSpotifyConnect}
-                className="flex w-full items-center gap-3 rounded-xl border border-[hsl(141,70%,45%)]/30 px-4 py-3 transition-all hover:bg-[hsl(141,70%,45%)]/5"
+                className="flex w-full items-center gap-3 rounded-xl bg-[hsl(141,70%,38%)] px-4 py-3.5 shadow-lg shadow-[hsl(141,70%,38%)]/30 transition-all hover:bg-[hsl(141,70%,42%)] hover:shadow-xl hover:shadow-[hsl(141,70%,38%)]/40"
               >
-                <Music2 className="h-5 w-5 text-[hsl(141,70%,45%)]" />
+                <Music2 className="h-5 w-5 text-white" />
                 <div className="flex-1 text-left">
-                  <p className="text-sm font-medium text-foreground">Connect Spotify</p>
-                  <p className="text-xs text-muted-foreground">Play full tracks with Premium</p>
+                  <p className="text-sm font-semibold text-white">Connect Spotify</p>
+                  <p className="text-xs text-white/70">Play full tracks with Premium</p>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 text-white/70" />
               </button>
             )}
           </motion.div>
