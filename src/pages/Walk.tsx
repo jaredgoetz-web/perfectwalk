@@ -41,42 +41,43 @@ const Walk = () => {
   const [completedPhases, setCompletedPhases] = useState<number[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Selected playlist song map: phaseIndex → audioSrc
-  const [phaseAudio, setPhaseAudio] = useState<Record<number, string>>({});
+  // Selected playlist media map: phaseIndex → PhaseMedia
+  const [phaseMedia, setPhaseMedia] = useState<Record<number, PhaseMedia>>({});
 
-  // Build default audio map (first song per phase)
-  const defaultAudio = useMemo(() => {
-    const map: Record<number, string> = {};
+  // Build default media map (first song per phase)
+  const defaultMedia = useMemo(() => {
+    const map: Record<number, PhaseMedia> = {};
     walkPhases.forEach((phase, idx) => {
       const songs = getSongsByPhase(phase.id);
-      if (songs.length > 0) map[idx] = songs[0].audioSrc;
+      if (songs.length > 0) map[idx] = songToMedia(songs[0]);
     });
     return map;
   }, []);
 
   const myPlaylists = useMemo(() => loadPlaylists(), []);
 
-  const selectPlaylist = (audioMap: Record<number, string>) => {
-    setPhaseAudio(audioMap);
+  const selectPlaylist = (mediaMap: Record<number, PhaseMedia>) => {
+    setPhaseMedia(mediaMap);
     setScreen("walking");
   };
 
-  const selectDefault = () => selectPlaylist(defaultAudio);
+  const selectDefault = () => selectPlaylist(defaultMedia);
 
   const selectCustom = (pl: CustomPlaylist) => {
-    const map: Record<number, string> = {};
+    const allSongs = [...songLibrary, ...loadUserSongs()];
+    const map: Record<number, PhaseMedia> = {};
     pl.songIds.forEach((songId) => {
-      const song = songLibrary.find((s) => s.id === songId);
+      const song = allSongs.find((s) => s.id === songId);
       if (song) {
         const phaseIdx = walkPhases.findIndex((p) => p.id === song.phaseId);
-        if (phaseIdx >= 0) map[phaseIdx] = song.audioSrc;
+        if (phaseIdx >= 0) map[phaseIdx] = songToMedia(song);
       }
     });
     selectPlaylist(map);
   };
 
   const selectNoMusic = () => {
-    setPhaseAudio({});
+    setPhaseMedia({});
     setScreen("walking");
   };
 
