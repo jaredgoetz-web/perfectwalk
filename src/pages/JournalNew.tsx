@@ -28,6 +28,52 @@ const JournalNew = () => {
   const [mood, setMood] = useState<string>("");
   const [journal, setJournal] = useState("");
   const [prompt] = useState(() => prompts[Math.floor(Math.random() * prompts.length)]);
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const startRecording = useCallback(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in your browser. Try Chrome or Safari.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    let finalTranscript = "";
+
+    recognition.onresult = (event: any) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript + " ";
+        } else {
+          interim = transcript;
+        }
+      }
+      setJournal((prev) => {
+        const base = prev.endsWith(" ") ? prev : prev ? prev + " " : "";
+        return base + finalTranscript + interim;
+      });
+      finalTranscript = "";
+    };
+
+    recognition.onerror = () => setIsRecording(false);
+    recognition.onend = () => setIsRecording(false);
+
+    recognition.start();
+    recognitionRef.current = recognition;
+    setIsRecording(true);
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    recognitionRef.current?.stop();
+    setIsRecording(false);
+  }, []);
 
   const handleSave = () => {
     if (walkId) {
