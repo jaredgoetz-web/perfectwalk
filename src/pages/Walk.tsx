@@ -74,7 +74,9 @@ const Walk = () => {
       </div>
 
       {/* Timer */}
-      <div className="mt-8 flex flex-col items-center">
+      <div className="relative mt-8 flex flex-col items-center overflow-hidden rounded-3xl mx-4 py-8">
+        <img src={heartBg} alt="" className="absolute inset-0 h-full w-full object-cover opacity-15" />
+        <div className="absolute inset-0 bg-background/60" />
         <motion.div
           key={currentPhase}
           initial={{ scale: 0.8, opacity: 0 }}
