@@ -56,7 +56,7 @@ const Index = () => {
           {stats.map(({ icon: Icon, label, value }) => (
             <div
               key={label}
-              className="flex flex-col items-center gap-1 rounded-xl bg-card p-4 shadow-elevated"
+              className="flex flex-col items-center gap-2 rounded-xl bg-card px-4 pt-5 pb-4 shadow-elevated"
             >
               <Icon className="h-5 w-5 text-primary" />
               <span className="font-display text-2xl font-bold text-foreground">{value}</span>
