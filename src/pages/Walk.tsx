@@ -111,6 +111,7 @@ const Walk = () => {
 
   return (
     <div className="min-h-screen pb-24">
+      <audio ref={audioRef} preload="auto" />
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-5">
         <button onClick={handleCancel} className="rounded-full p-2 text-muted-foreground hover:bg-secondary">
