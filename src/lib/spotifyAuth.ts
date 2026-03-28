@@ -2,7 +2,7 @@
 // Replace this with your Spotify Developer App Client ID
 const CLIENT_ID = "6e241e6b6295492ca14cbbb054952e0e";
 const REDIRECT_URI = `${window.location.origin}/callback`;
-const SCOPES = "streaming user-read-email user-read-playback-state user-modify-playback-state";
+const SCOPES = "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state";
 
 const TOKEN_KEY = "spotify_token";
 const VERIFIER_KEY = "spotify_pkce_verifier";
