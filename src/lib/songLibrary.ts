@@ -53,7 +53,8 @@ export const songLibrary: Song[] = [
 ];
 
 export function getSongsByPhase(phaseId: number): Song[] {
-  return songLibrary.filter((s) => s.phaseId === phaseId);
+  const userSongs = loadUserSongs();
+  return [...songLibrary, ...userSongs].filter((s) => s.phaseId === phaseId);
 }
 
 export interface CustomPlaylist {
