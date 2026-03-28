@@ -59,23 +59,24 @@ const Index = () => {
             padding: "5px",
           }}
         >
-          <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-full text-center"
+          <div className="relative flex h-full w-full flex-col items-center justify-center overflow-visible rounded-full text-center"
             style={{ background: "radial-gradient(circle at center, white 60%, hsl(220 40% 96%) 100%)" }}
           >
-            <span className="font-display text-sm font-medium tracking-[0.25em] uppercase" style={{ color: "hsl(220 50% 25%)" }}>
-              The
-            </span>
-            <span className="font-display text-[2.1rem] font-bold leading-none tracking-tight" style={{ color: "hsl(220 55% 18%)" }}>
-              Perfect
-            </span>
-            <span className="font-display text-[2.1rem] font-bold leading-none tracking-tight" style={{ color: "hsl(220 55% 18%)" }}>
-              Walk
-            </span>
+            {/* Silhouette behind text */}
             <img
               src={walkSilhouette}
               alt="Walking silhouette"
-              className="absolute -bottom-2 h-28 w-auto opacity-80"
+              className="absolute -bottom-10 h-56 w-auto opacity-20"
             />
+            <span className="relative z-10 font-display text-sm font-medium tracking-[0.25em] uppercase" style={{ color: "hsl(220 50% 25%)" }}>
+              The
+            </span>
+            <span className="relative z-10 font-display text-[2.1rem] font-bold leading-none tracking-tight" style={{ color: "hsl(220 55% 18%)" }}>
+              Perfect
+            </span>
+            <span className="relative z-10 font-display text-[2.1rem] font-bold leading-none tracking-tight" style={{ color: "hsl(220 55% 18%)" }}>
+              Walk
+            </span>
           </div>
         </motion.div>
 
