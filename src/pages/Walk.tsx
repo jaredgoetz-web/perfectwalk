@@ -90,14 +90,14 @@ const Walk = () => {
     return () => clearInterval(interval);
   }, [isWalking]);
 
-  // Audio playback
+  // Audio playback (only for non-Spotify tracks)
+  const currentMedia = phaseMedia[currentPhase];
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const src = phaseAudio[currentPhase];
-    if (src) {
-      if (!audio.src.endsWith(src)) {
-        audio.src = src;
+    if (currentMedia?.type === "audio" && currentMedia.audioSrc) {
+      if (!audio.src.endsWith(currentMedia.audioSrc)) {
+        audio.src = currentMedia.audioSrc;
       }
       if (isWalking) {
         audio.play().catch(() => {});
@@ -108,7 +108,7 @@ const Walk = () => {
       audio.pause();
       audio.src = "";
     }
-  }, [isWalking, currentPhase, phaseAudio]);
+  }, [isWalking, currentPhase, currentMedia]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
