@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { motion } from "framer-motion";
-import { ArrowLeft, Check } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, Check, Mic, MicOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { updateWalkEntry, moodEmoji } from "@/lib/walkStore";
@@ -28,6 +28,52 @@ const JournalNew = () => {
   const [mood, setMood] = useState<string>("");
   const [journal, setJournal] = useState("");
   const [prompt] = useState(() => prompts[Math.floor(Math.random() * prompts.length)]);
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const startRecording = useCallback(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in your browser. Try Chrome or Safari.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    let finalTranscript = "";
+
+    recognition.onresult = (event: any) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript + " ";
+        } else {
+          interim = transcript;
+        }
+      }
+      setJournal((prev) => {
+        const base = prev.endsWith(" ") ? prev : prev ? prev + " " : "";
+        return base + finalTranscript + interim;
+      });
+      finalTranscript = "";
+    };
+
+    recognition.onerror = () => setIsRecording(false);
+    recognition.onend = () => setIsRecording(false);
+
+    recognition.start();
+    recognitionRef.current = recognition;
+    setIsRecording(true);
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    recognitionRef.current?.stop();
+    setIsRecording(false);
+  }, []);
 
   const handleSave = () => {
     if (walkId) {
@@ -99,6 +145,36 @@ const JournalNew = () => {
             placeholder="Share your experience..."
             className="mt-3 min-h-[140px] resize-none rounded-xl border-border bg-card text-foreground"
           />
+          <Button
+            type="button"
+            variant={isRecording ? "destructive" : "outline"}
+            onClick={isRecording ? stopRecording : startRecording}
+            className={`mt-3 w-full gap-2 rounded-full ${isRecording ? "" : "border-primary/30 text-primary hover:bg-primary/10"}`}
+          >
+            {isRecording ? (
+              <>
+                <MicOff className="h-4 w-4" />
+                Stop Recording
+              </>
+            ) : (
+              <>
+                <Mic className="h-4 w-4" />
+                Capture My Experience
+              </>
+            )}
+          </Button>
+          <AnimatePresence>
+            {isRecording && (
+              <motion.p
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-2 text-center text-xs text-muted-foreground"
+              >
+                🎙️ Listening… speak freely and your words will appear above
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Save */}
