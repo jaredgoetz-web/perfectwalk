@@ -175,6 +175,10 @@ const JournalNew = () => {
               </motion.p>
             )}
           </AnimatePresence>
+        </div>
+
+        {/* Save */}
+        <div className="mt-8 flex gap-3">
           <Button
             variant="outline"
             onClick={() => navigate("/journal")}
