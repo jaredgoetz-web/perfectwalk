@@ -1,6 +1,6 @@
 // Spotify OAuth PKCE flow — no backend needed
 // Replace this with your Spotify Developer App Client ID
-const CLIENT_ID = "YOUR_SPOTIFY_CLIENT_ID";
+const CLIENT_ID = "6e241e6b6295492ca14cbbb054952e0e";
 const REDIRECT_URI = `${window.location.origin}/callback`;
 const SCOPES = "streaming user-read-email user-read-playback-state user-modify-playback-state";
 
