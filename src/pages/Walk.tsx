@@ -1,11 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import heartBg from "@/assets/phase-heart-bg.jpg";
-import { Play, Pause, SkipForward, Check, X } from "lucide-react";
+import { Play, Pause, SkipForward, Check, X, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import WalkPhaseCard, { walkPhases } from "@/components/WalkPhaseCard";
 import { saveWalkEntry, WalkEntry } from "@/lib/walkStore";
+
+// Map phase index to audio file (add more as you upload them)
+const phaseAudio: Record<number, string> = {
+  0: "/audio/phase-1-heart.mp3",
+};
 
 const Walk = () => {
   const navigate = useNavigate();
@@ -13,6 +18,7 @@ const Walk = () => {
   const [currentPhase, setCurrentPhase] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [completedPhases, setCompletedPhases] = useState<number[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -21,6 +27,26 @@ const Walk = () => {
     }
     return () => clearInterval(interval);
   }, [isWalking]);
+
+  // Audio playback
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const src = phaseAudio[currentPhase];
+    if (src) {
+      if (!audio.src.endsWith(src)) {
+        audio.src = src;
+      }
+      if (isWalking) {
+        audio.play().catch(() => {});
+      } else {
+        audio.pause();
+      }
+    } else {
+      audio.pause();
+      audio.src = "";
+    }
+  }, [isWalking, currentPhase]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -39,6 +65,29 @@ const Walk = () => {
       setCurrentPhase((p) => p + 1);
     }
   }, [currentPhase, completedPhases]);
+
+  // Auto-advance when song ends
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onEnded = () => {
+      if (currentPhase < walkPhases.length - 1) {
+        handleNextPhase();
+      }
+    };
+    audio.addEventListener("ended", onEnded);
+    return () => audio.removeEventListener("ended", onEnded);
+  }, [currentPhase, handleNextPhase]);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = "";
+      }
+    };
+  }, []);
 
   const handleFinish = () => {
     setIsWalking(false);
@@ -62,6 +111,7 @@ const Walk = () => {
 
   return (
     <div className="min-h-screen pb-24">
+      <audio ref={audioRef} preload="auto" />
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-5">
         <button onClick={handleCancel} className="rounded-full p-2 text-muted-foreground hover:bg-secondary">
