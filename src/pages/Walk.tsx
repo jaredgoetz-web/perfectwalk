@@ -46,16 +46,19 @@ const Walk = () => {
   // Spotify state
   const [spotifyConnected, setSpotifyConnected] = useState(isSpotifyLoggedIn());
   const [spotifyName, setSpotifyName] = useState<string | null>(null);
-  const [spotifyIsPremium, setSpotifyIsPremium] = useState(false);
+  const [spotifyPlan, setSpotifyPlan] = useState<"checking" | "premium" | "free">(
+    isSpotifyLoggedIn() ? "checking" : "free"
+  );
   const spotify = useSpotifyPlayer();
 
   // Fetch Spotify profile on mount
   useEffect(() => {
     if (spotifyConnected) {
+      setSpotifyPlan("checking");
       fetchSpotifyProfile().then((profile) => {
         if (profile) {
           setSpotifyName(profile.display_name);
-          setSpotifyIsPremium(profile.product === "premium");
+          setSpotifyPlan(profile.product === "premium" ? "premium" : "free");
         }
       });
     }
@@ -112,7 +115,7 @@ const Walk = () => {
 
   // Determine if we should use Spotify SDK for current track
   const currentMedia = phaseMedia[currentPhase];
-  const useSDK = spotifyConnected && spotifyIsPremium && spotify.isReady && currentMedia?.type === "spotify";
+  const useSDK = spotifyConnected && spotifyPlan === "premium" && spotify.isReady && currentMedia?.type === "spotify";
 
   // Audio playback (only for non-Spotify or fallback)
   useEffect(() => {
@@ -222,7 +225,7 @@ const Walk = () => {
     spotifyLogout();
     setSpotifyConnected(false);
     setSpotifyName(null);
-    setSpotifyIsPremium(false);
+    setSpotifyPlan("free");
   };
 
   const phase = walkPhases[currentPhase];
@@ -266,7 +269,11 @@ const Walk = () => {
                     {spotifyName && <span className="text-muted-foreground"> · {spotifyName}</span>}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {spotifyIsPremium ? "Premium · Full tracks enabled" : "Free tier · 30s previews only"}
+                    {spotifyPlan === "checking"
+                      ? "Checking account status…"
+                      : spotifyPlan === "premium"
+                        ? "Premium · Full tracks enabled"
+                        : "Free tier · 30s previews only"}
                   </p>
                 </div>
                 <button onClick={handleSpotifyDisconnect} className="p-1.5 rounded-full hover:bg-secondary text-muted-foreground">
