@@ -6,12 +6,14 @@ import { Play, Pause, SkipForward, Check, X, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import WalkPhaseCard, { walkPhases } from "@/components/WalkPhaseCard";
 import { saveWalkEntry, WalkEntry } from "@/lib/walkStore";
+import { getSongsByPhase } from "@/lib/songLibrary";
 
-// Map phase index to audio file (add more as you upload them)
-const phaseAudio: Record<number, string> = {
-  0: "/audio/phase-1-heart.mp3",
-  4: "/audio/phase-5-celebrate.mp3",
-};
+// Build phase audio map from song library (use first song per phase)
+const phaseAudio: Record<number, string> = {};
+walkPhases.forEach((phase, idx) => {
+  const songs = getSongsByPhase(phase.id);
+  if (songs.length > 0) phaseAudio[idx] = songs[0].audioSrc;
+});
 
 const Walk = () => {
   const navigate = useNavigate();
