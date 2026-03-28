@@ -10,6 +10,7 @@ import Playlists from "./pages/Playlists";
 import Journal from "./pages/Journal";
 import JournalNew from "./pages/JournalNew";
 import Stats from "./pages/Stats";
+import SpotifyCallback from "./pages/SpotifyCallback";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/journal" element={<Journal />} />
           <Route path="/journal/new" element={<JournalNew />} />
           <Route path="/stats" element={<Stats />} />
+          <Route path="/callback" element={<SpotifyCallback />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         <BottomNav />

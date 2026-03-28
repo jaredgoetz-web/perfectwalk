@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import heartBg from "@/assets/phase-heart-bg.jpg";
-import { Play, Pause, SkipForward, Check, X, ListMusic, Sparkles, ChevronRight } from "lucide-react";
+import { Play, Pause, SkipForward, Check, X, ListMusic, Sparkles, ChevronRight, Music2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import WalkPhaseCard, { walkPhases } from "@/components/WalkPhaseCard";
 import { saveWalkEntry, WalkEntry } from "@/lib/walkStore";
 import SpotifyEmbed from "@/components/SpotifyEmbed";
+import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
+import { isLoggedIn as isSpotifyLoggedIn, loginWithSpotify, logout as spotifyLogout, fetchSpotifyProfile } from "@/lib/spotifyAuth";
 import {
   songLibrary,
   getSongsByPhase,
@@ -40,6 +42,24 @@ const Walk = () => {
   const [elapsed, setElapsed] = useState(0);
   const [completedPhases, setCompletedPhases] = useState<number[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Spotify state
+  const [spotifyConnected, setSpotifyConnected] = useState(isSpotifyLoggedIn());
+  const [spotifyName, setSpotifyName] = useState<string | null>(null);
+  const [spotifyIsPremium, setSpotifyIsPremium] = useState(false);
+  const spotify = useSpotifyPlayer();
+
+  // Fetch Spotify profile on mount
+  useEffect(() => {
+    if (spotifyConnected) {
+      fetchSpotifyProfile().then((profile) => {
+        if (profile) {
+          setSpotifyName(profile.display_name);
+          setSpotifyIsPremium(profile.product === "premium");
+        }
+      });
+    }
+  }, [spotifyConnected]);
 
   // Selected playlist media map: phaseIndex → PhaseMedia
   const [phaseMedia, setPhaseMedia] = useState<Record<number, PhaseMedia>>({});
@@ -90,12 +110,15 @@ const Walk = () => {
     return () => clearInterval(interval);
   }, [isWalking]);
 
-  // Audio playback (only for non-Spotify tracks)
+  // Determine if we should use Spotify SDK for current track
   const currentMedia = phaseMedia[currentPhase];
+  const useSDK = spotifyConnected && spotifyIsPremium && spotify.isReady && currentMedia?.type === "spotify";
+
+  // Audio playback (only for non-Spotify or fallback)
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (currentMedia?.type === "audio" && currentMedia.audioSrc) {
+    if (!useSDK && currentMedia?.type === "audio" && currentMedia.audioSrc) {
       if (!audio.src.endsWith(currentMedia.audioSrc)) {
         audio.src = currentMedia.audioSrc;
       }
@@ -108,7 +131,27 @@ const Walk = () => {
       audio.pause();
       audio.src = "";
     }
-  }, [isWalking, currentPhase, currentMedia]);
+  }, [isWalking, currentPhase, currentMedia, useSDK]);
+
+  // Spotify SDK playback
+  useEffect(() => {
+    if (!useSDK || !currentMedia?.spotifyTrackId) return;
+    if (isWalking) {
+      spotify.play(`spotify:track:${currentMedia.spotifyTrackId}`);
+    } else {
+      spotify.pause();
+    }
+  }, [isWalking, currentPhase, useSDK, currentMedia?.spotifyTrackId]);
+
+  // Auto-advance on track end (SDK)
+  useEffect(() => {
+    if (!useSDK) return;
+    spotify.onTrackEnd(() => {
+      if (currentPhase < walkPhases.length - 1) {
+        handleNextPhase();
+      }
+    });
+  }, [useSDK, currentPhase]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -128,7 +171,7 @@ const Walk = () => {
     }
   }, [currentPhase, completedPhases]);
 
-  // Auto-advance when song ends
+  // Auto-advance when audio song ends
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -153,6 +196,7 @@ const Walk = () => {
 
   const handleFinish = () => {
     setIsWalking(false);
+    spotify.pause();
     const entry: WalkEntry = {
       id: Date.now().toString(),
       date: new Date().toISOString(),
@@ -165,11 +209,20 @@ const Walk = () => {
 
   const handleCancel = () => {
     if (screen === "walking" && elapsed > 0 && !window.confirm("End your walk without saving?")) return;
+    spotify.pause();
     if (screen === "walking" && elapsed === 0) {
       setScreen("pick");
       return;
     }
     navigate("/");
+  };
+
+  const handleSpotifyConnect = () => loginWithSpotify("/walk");
+  const handleSpotifyDisconnect = () => {
+    spotifyLogout();
+    setSpotifyConnected(false);
+    setSpotifyName(null);
+    setSpotifyIsPremium(false);
   };
 
   const phase = walkPhases[currentPhase];
@@ -197,7 +250,45 @@ const Walk = () => {
             </p>
           </motion.div>
 
-          <div className="mt-8 space-y-3">
+          {/* Spotify Connect Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.02 }}
+            className="mt-6"
+          >
+            {spotifyConnected ? (
+              <div className="flex items-center gap-3 rounded-xl bg-[hsl(141,70%,45%)]/10 border border-[hsl(141,70%,45%)]/20 px-4 py-3">
+                <Music2 className="h-5 w-5 text-[hsl(141,70%,45%)]" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    Spotify Connected
+                    {spotifyName && <span className="text-muted-foreground"> · {spotifyName}</span>}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {spotifyIsPremium ? "Premium · Full tracks enabled" : "Free tier · 30s previews only"}
+                  </p>
+                </div>
+                <button onClick={handleSpotifyDisconnect} className="p-1.5 rounded-full hover:bg-secondary text-muted-foreground">
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleSpotifyConnect}
+                className="flex w-full items-center gap-3 rounded-xl border border-[hsl(141,70%,45%)]/30 px-4 py-3 transition-all hover:bg-[hsl(141,70%,45%)]/5"
+              >
+                <Music2 className="h-5 w-5 text-[hsl(141,70%,45%)]" />
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-medium text-foreground">Connect Spotify</p>
+                  <p className="text-xs text-muted-foreground">Play full tracks with Premium</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            )}
+          </motion.div>
+
+          <div className="mt-6 space-y-3">
             {/* Default / curated */}
             <motion.button
               initial={{ opacity: 0, y: 15 }}
@@ -373,7 +464,16 @@ const Walk = () => {
       {/* Now playing info / Spotify embed */}
       {currentMedia && (
         <div className="mx-auto mt-6 max-w-lg px-5">
-          {currentMedia.type === "spotify" && currentMedia.spotifyTrackId ? (
+          {useSDK ? (
+            // Full playback via Spotify SDK — show simple now-playing indicator
+            <div className="flex items-center gap-2 rounded-xl bg-card px-4 py-3 shadow-warm">
+              <div className="h-2 w-2 rounded-full bg-[hsl(141,70%,45%)] animate-pulse" />
+              <p className="text-sm text-muted-foreground">
+                Playing via Spotify:{" "}
+                <span className="font-semibold text-foreground">{currentMedia.title}</span>
+              </p>
+            </div>
+          ) : currentMedia.type === "spotify" && currentMedia.spotifyTrackId ? (
             <div className="rounded-xl overflow-hidden shadow-warm">
               <SpotifyEmbed trackId={currentMedia.spotifyTrackId} compact={false} autoPlay={isWalking} />
             </div>
@@ -388,6 +488,13 @@ const Walk = () => {
               </p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Spotify error */}
+      {spotify.error && (
+        <div className="mx-auto mt-3 max-w-lg px-5">
+          <p className="text-xs text-center text-muted-foreground">{spotify.error}</p>
         </div>
       )}
 
