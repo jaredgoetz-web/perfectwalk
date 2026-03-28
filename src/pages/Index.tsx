@@ -53,13 +53,13 @@ const Index = () => {
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1, ease: "easeOut" }}
-          className="relative flex h-52 w-52 items-center justify-center rounded-full shadow-lg"
+          className="relative flex h-56 w-56 items-center justify-center rounded-full shadow-lg"
           style={{
             background: "linear-gradient(135deg, hsl(38 90% 55%), hsl(28 85% 50%))",
             padding: "5px",
           }}
         >
-          <div className="flex h-full w-full flex-col items-center justify-center rounded-full text-center"
+          <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-full text-center"
             style={{ background: "radial-gradient(circle at center, white 60%, hsl(220 40% 96%) 100%)" }}
           >
             <span className="font-display text-sm font-medium tracking-[0.25em] uppercase" style={{ color: "hsl(220 50% 25%)" }}>
@@ -71,6 +71,11 @@ const Index = () => {
             <span className="font-display text-[2.1rem] font-bold leading-none tracking-tight" style={{ color: "hsl(220 55% 18%)" }}>
               Walk
             </span>
+            <img
+              src={walkSilhouette}
+              alt="Walking silhouette"
+              className="absolute -bottom-2 h-28 w-auto opacity-80"
+            />
           </div>
         </motion.div>
 
