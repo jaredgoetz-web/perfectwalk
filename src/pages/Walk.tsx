@@ -6,13 +6,29 @@ import { Play, Pause, SkipForward, Check, X, ListMusic, Sparkles, ChevronRight }
 import { Button } from "@/components/ui/button";
 import WalkPhaseCard, { walkPhases } from "@/components/WalkPhaseCard";
 import { saveWalkEntry, WalkEntry } from "@/lib/walkStore";
+import SpotifyEmbed from "@/components/SpotifyEmbed";
 import {
   songLibrary,
   getSongsByPhase,
   loadPlaylists,
+  loadUserSongs,
   CustomPlaylist,
   Song,
 } from "@/lib/songLibrary";
+
+interface PhaseMedia {
+  type: "audio" | "spotify";
+  audioSrc?: string;
+  spotifyTrackId?: string;
+  title: string;
+}
+
+function songToMedia(song: Song): PhaseMedia {
+  if (song.spotifyTrackId) {
+    return { type: "spotify", spotifyTrackId: song.spotifyTrackId, title: song.title };
+  }
+  return { type: "audio", audioSrc: song.audioSrc, title: song.title };
+}
 
 type Screen = "pick" | "walking";
 
