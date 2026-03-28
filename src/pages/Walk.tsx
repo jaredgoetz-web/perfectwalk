@@ -375,7 +375,7 @@ const Walk = () => {
         <div className="mx-auto mt-6 max-w-lg px-5">
           {currentMedia.type === "spotify" && currentMedia.spotifyTrackId ? (
             <div className="rounded-xl overflow-hidden shadow-warm">
-              <SpotifyEmbed trackId={currentMedia.spotifyTrackId} compact={false} />
+              <SpotifyEmbed trackId={currentMedia.spotifyTrackId} compact={false} autoPlay={isWalking} />
             </div>
           ) : (
             <div className="flex items-center gap-2 rounded-xl bg-card px-4 py-3 shadow-warm">
