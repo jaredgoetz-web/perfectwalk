@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import heartBg from "@/assets/phase-heart-bg.jpg";
 import { Play, Pause, SkipForward, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import WalkPhaseCard, { walkPhases } from "@/components/WalkPhaseCard";
@@ -73,12 +74,14 @@ const Walk = () => {
       </div>
 
       {/* Timer */}
-      <div className="mt-8 flex flex-col items-center">
+      <div className="relative mt-8 flex flex-col items-center overflow-hidden rounded-3xl mx-4 py-8">
+        <img src={heartBg} alt="" className="absolute inset-0 h-full w-full object-cover opacity-15" />
+        <div className="absolute inset-0 bg-background/60" />
         <motion.div
           key={currentPhase}
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className={`flex h-32 w-32 items-center justify-center rounded-full bg-secondary ${phase.color}`}
+          className={`relative z-10 flex h-32 w-32 items-center justify-center rounded-full bg-secondary ${phase.color}`}
         >
           <Icon className="h-14 w-14" />
         </motion.div>
@@ -89,7 +92,7 @@ const Walk = () => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="mt-6 text-center"
+            className="relative z-10 mt-6 text-center"
           >
             <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">
               Phase {phase.id} of 5
@@ -101,7 +104,7 @@ const Walk = () => {
           </motion.div>
         </AnimatePresence>
 
-        <p className="mt-6 font-display text-5xl font-bold tabular-nums text-foreground">
+        <p className="relative z-10 mt-6 font-display text-5xl font-bold tabular-nums text-foreground">
           {formatTime(elapsed)}
         </p>
       </div>
