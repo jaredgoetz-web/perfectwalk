@@ -165,7 +165,7 @@ const Playlists = () => {
             >
               {walkPhases.map((phase) => {
                 const Icon = phase.icon;
-                const songs = getSongsByPhase(phase.id);
+                const songs = getSongsByPhase(phase.id); // refreshKey: {refreshKey} triggers re-render
                 const isExpanded = expandedPhase === phase.id;
 
                 return (
