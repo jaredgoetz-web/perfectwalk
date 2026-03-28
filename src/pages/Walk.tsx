@@ -66,6 +66,29 @@ const Walk = () => {
     }
   }, [currentPhase, completedPhases]);
 
+  // Auto-advance when song ends
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onEnded = () => {
+      if (currentPhase < walkPhases.length - 1) {
+        handleNextPhase();
+      }
+    };
+    audio.addEventListener("ended", onEnded);
+    return () => audio.removeEventListener("ended", onEnded);
+  }, [currentPhase, handleNextPhase]);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = "";
+      }
+    };
+  }, []);
+
   const handleFinish = () => {
     setIsWalking(false);
     const entry: WalkEntry = {
