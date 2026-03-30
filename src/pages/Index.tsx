@@ -1,12 +1,17 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Play, Flame, Clock, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import brandingImage from "@/assets/branding.jpg";
 import { getStreak, getTotalWalks, getTotalMinutes } from "@/lib/walkStore";
+import OnboardingFlow from "@/components/OnboardingFlow";
 
 const Index = () => {
   const navigate = useNavigate();
+  const [showOnboarding, setShowOnboarding] = useState(
+    () => !localStorage.getItem("tpw_onboarded")
+  );
   const streak = getStreak();
   const totalWalks = getTotalWalks();
   const totalMinutes = getTotalMinutes();
