@@ -24,6 +24,9 @@ const Index = () => {
 
   return (
     <div className="min-h-screen pb-24">
+      {showOnboarding && (
+        <OnboardingFlow onComplete={() => setShowOnboarding(false)} />
+      )}
       {/* Hero */}
       <div className="relative overflow-hidden">
         <img
