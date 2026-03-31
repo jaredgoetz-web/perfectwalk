@@ -25,7 +25,23 @@ const Index = () => {
   return (
     <div className="min-h-screen pb-24">
       {showOnboarding && (
-        <OnboardingFlow onComplete={() => setShowOnboarding(false)} />
+        <OnboardingFlow
+          onComplete={() => {
+            setShowOnboarding(false);
+            if (!localStorage.getItem("tpw_personalized")) {
+              setShowPersonalization(true);
+            }
+          }}
+        />
+      )}
+      {showPersonalization && (
+        <PersonalizationChat
+          onComplete={() => {
+            setShowPersonalization(false);
+            navigate("/walk");
+          }}
+          onSkip={() => setShowPersonalization(false)}
+        />
       )}
       {/* Hero */}
       <div className="relative overflow-hidden">
