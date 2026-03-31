@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import brandingImage from "@/assets/branding.jpg";
 import { getStreak, getTotalWalks, getTotalMinutes } from "@/lib/walkStore";
 import OnboardingFlow from "@/components/OnboardingFlow";
+import PersonalizationChat from "@/components/PersonalizationChat";
 
 const Index = () => {
   const navigate = useNavigate();
   const [showOnboarding, setShowOnboarding] = useState(
     () => !localStorage.getItem("tpw_onboarded")
   );
+  const [showPersonalization, setShowPersonalization] = useState(false);
   const streak = getStreak();
   const totalWalks = getTotalWalks();
   const totalMinutes = getTotalMinutes();
@@ -25,7 +27,23 @@ const Index = () => {
   return (
     <div className="min-h-screen pb-24">
       {showOnboarding && (
-        <OnboardingFlow onComplete={() => setShowOnboarding(false)} />
+        <OnboardingFlow
+          onComplete={() => {
+            setShowOnboarding(false);
+            if (!localStorage.getItem("tpw_personalized")) {
+              setShowPersonalization(true);
+            }
+          }}
+        />
+      )}
+      {showPersonalization && (
+        <PersonalizationChat
+          onComplete={() => {
+            setShowPersonalization(false);
+            navigate("/walk");
+          }}
+          onSkip={() => setShowPersonalization(false)}
+        />
       )}
       {/* Hero */}
       <div className="relative overflow-hidden">

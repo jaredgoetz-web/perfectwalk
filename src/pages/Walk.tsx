@@ -416,6 +416,20 @@ const Walk = () => {
               {phase.title}
             </h2>
             <p className="mt-1 text-muted-foreground">{phase.subtitle}</p>
+            {(() => {
+              try {
+                const prompts = JSON.parse(localStorage.getItem("tpw_phase_prompts") || "{}");
+                const prompt = prompts[String(phase.id)];
+                if (prompt) {
+                  return (
+                    <p className="mt-3 text-sm italic leading-relaxed text-foreground/80 max-w-xs mx-auto">
+                      "{prompt}"
+                    </p>
+                  );
+                }
+              } catch {}
+              return null;
+            })()}
           </motion.div>
         </AnimatePresence>
 
