@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import heartBg from "@/assets/phase-heart-bg.jpg";
 import { Play, Pause, SkipForward, Check, X, ListMusic, Sparkles, ChevronRight, Music2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
