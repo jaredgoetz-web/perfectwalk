@@ -48,6 +48,8 @@ const QUESTIONS: { key: string; question: string; placeholder: string }[] = [
   },
 ];
 
+const CUSTOM_VOICE_ID = "dAUhldnXM7Bt5luFXmMZ";
+
 interface PersonalizationChatProps {
   onComplete: () => void;
   onSkip: () => void;
@@ -74,86 +76,132 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Speak assistant message via TTS
-  // Queue-based TTS to prevent overlapping audio
+  const currentAudioUrlRef = useRef<string | null>(null);
   const ttsQueueRef = useRef<string[]>([]);
   const isProcessingTTSRef = useRef(false);
+  const didInitRef = useRef(false);
+  const isUnmountedRef = useRef(false);
+
+  const stopCurrentAudio = useCallback(() => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      currentAudioRef.current.src = "";
+      currentAudioRef.current.load();
+      currentAudioRef.current = null;
+    }
+
+    if (currentAudioUrlRef.current) {
+      URL.revokeObjectURL(currentAudioUrlRef.current);
+      currentAudioUrlRef.current = null;
+    }
+
+    setIsSpeaking(false);
+  }, []);
+
+  const resetTTS = useCallback(() => {
+    ttsQueueRef.current = [];
+    isProcessingTTSRef.current = false;
+    stopCurrentAudio();
+  }, [stopCurrentAudio]);
 
   const processTTSQueue = useCallback(async () => {
-    if (isProcessingTTSRef.current || ttsQueueRef.current.length === 0) return;
+    if (isProcessingTTSRef.current || ttsQueueRef.current.length === 0 || isUnmountedRef.current) {
+      return;
+    }
+
     isProcessingTTSRef.current = true;
 
-    while (ttsQueueRef.current.length > 0) {
-      const text = ttsQueueRef.current.shift()!;
-      const cleanText = text.replace(/[\u{1F600}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu, "").trim();
+    while (ttsQueueRef.current.length > 0 && !isUnmountedRef.current) {
+      const text = ttsQueueRef.current.shift();
+      if (!text) continue;
+
+      const cleanText = text
+        .replace(/[\u{1F600}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu, "")
+        .trim();
+
       if (!cleanText) continue;
 
       try {
+        stopCurrentAudio();
         setIsSpeaking(true);
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            },
-            body: JSON.stringify({ text: cleanText }),
-          }
-        );
 
-        if (!response.ok) throw new Error("TTS failed");
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text: cleanText, voiceId: CUSTOM_VOICE_ID }),
+        });
+
+        if (!response.ok) throw new Error(`TTS failed: ${response.status}`);
 
         const audioBlob = await response.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
+        currentAudioUrlRef.current = audioUrl;
+
         const audio = new Audio(audioUrl);
         currentAudioRef.current = audio;
 
         await new Promise<void>((resolve) => {
-          audio.addEventListener("ended", () => {
-            setIsSpeaking(false);
-            currentAudioRef.current = null;
+          const cleanup = () => {
+            audio.onended = null;
+            audio.onerror = null;
             resolve();
-          });
-          audio.addEventListener("error", () => {
-            setIsSpeaking(false);
-            currentAudioRef.current = null;
-            resolve();
-          });
-          audio.play().catch(() => {
-            setIsSpeaking(false);
-            currentAudioRef.current = null;
-            resolve();
-          });
+          };
+
+          audio.onended = cleanup;
+          audio.onerror = cleanup;
+          audio.play().catch(cleanup);
         });
+
+        if (currentAudioRef.current === audio) {
+          currentAudioRef.current = null;
+        }
+
+        if (currentAudioUrlRef.current === audioUrl) {
+          URL.revokeObjectURL(audioUrl);
+          currentAudioUrlRef.current = null;
+        }
+
+        setIsSpeaking(false);
       } catch (err) {
         console.error("TTS error:", err);
-        setIsSpeaking(false);
+        stopCurrentAudio();
       }
     }
 
     isProcessingTTSRef.current = false;
-  }, []);
+  }, [stopCurrentAudio]);
 
-  const speakText = useCallback((text: string) => {
-    ttsQueueRef.current.push(text);
-    processTTSQueue();
-  }, [processTTSQueue]);
+  const speakText = useCallback(
+    (text: string, options?: { interrupt?: boolean }) => {
+      if (options?.interrupt) {
+        resetTTS();
+      }
 
-  // Show first question after intro
+      ttsQueueRef.current.push(text);
+      void processTTSQueue();
+    },
+    [processTTSQueue, resetTTS]
+  );
+
   useEffect(() => {
-    speakText(messages[0].text);
+    if (didInitRef.current) return;
+    didInitRef.current = true;
 
-    const t = setTimeout(() => {
+    speakText(messages[0].text, { interrupt: true });
+
+    const t = window.setTimeout(() => {
       const q = QUESTIONS[0].question;
       setMessages((prev) => [...prev, { role: "assistant", text: q }]);
       speakText(q);
     }, 800);
 
     return () => {
-      clearTimeout(t);
+      window.clearTimeout(t);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -166,15 +214,16 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
     if (showQuestion && inputMode === "text") inputRef.current?.focus();
   }, [showQuestion, currentQ, inputMode]);
 
-  // Voice recording
+  useEffect(() => {
+    return () => {
+      isUnmountedRef.current = true;
+      resetTTS();
+    };
+  }, [resetTTS]);
+
   const startRecording = async () => {
     try {
-      // Stop any playing audio
-      if (currentAudioRef.current) {
-        currentAudioRef.current.pause();
-        currentAudioRef.current = null;
-        setIsSpeaking(false);
-      }
+      resetTTS();
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
@@ -195,7 +244,6 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
       setIsRecording(true);
     } catch (err) {
       console.error("Mic error:", err);
-      // Fall back to text mode
       setInputMode("text");
     }
   };
@@ -213,17 +261,14 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
       const formData = new FormData();
       formData.append("audio", audioBlob, "recording.webm");
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-stt`,
-        {
-          method: "POST",
-          headers: {
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: formData,
-        }
-      );
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-stt`, {
+        method: "POST",
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: formData,
+      });
 
       if (!response.ok) throw new Error("STT failed");
 
@@ -246,24 +291,23 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
     setAnswers(newAnswers);
     setInput("");
     setShowQuestion(false);
-
     setMessages((prev) => [...prev, { role: "user", text: value }]);
 
     const nextQ = currentQ + 1;
 
     if (nextQ < QUESTIONS.length) {
-      setTimeout(() => {
+      window.setTimeout(() => {
         const nextText = QUESTIONS[nextQ].question;
         setMessages((prev) => [...prev, { role: "assistant", text: nextText }]);
-        speakText(nextText);
+        speakText(nextText, { interrupt: true });
         setCurrentQ(nextQ);
         setShowQuestion(true);
       }, 600);
     } else {
-      setTimeout(() => {
+      window.setTimeout(() => {
         const doneText = `Beautiful, ${newAnswers.name || "friend"}! ✨ Let me craft your personalized walk experience...`;
         setMessages((prev) => [...prev, { role: "assistant", text: doneText }]);
-        speakText(doneText);
+        speakText(doneText, { interrupt: true });
         generatePrompts(newAnswers);
       }, 600);
     }
@@ -298,7 +342,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
 
       const readyText = "Your walk is now personalized! 🌅 Each phase will have prompts crafted just for you. Ready to take your first Perfect Walk?";
       setMessages((prev) => [...prev, { role: "assistant", text: readyText }]);
-      speakText(readyText);
+      speakText(readyText, { interrupt: true });
       setIsGenerating(false);
     } catch (err) {
       console.error("Failed to generate prompts:", err);
@@ -309,7 +353,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
 
       const fallbackText = "I saved your info! I'll personalize your walk prompts next time. For now, you'll get the standard experience — still amazing! 🌟";
       setMessages((prev) => [...prev, { role: "assistant", text: fallbackText }]);
-      speakText(fallbackText);
+      speakText(fallbackText, { interrupt: true });
     }
   };
 
@@ -325,7 +369,6 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
-      {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full gradient-sunrise">
@@ -343,8 +386,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
         </button>
       </div>
 
-      {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         <AnimatePresence>
           {messages.map((msg, i) => (
             <motion.div
@@ -357,8 +399,8 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
               <div
                 className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                   msg.role === "user"
-                    ? "bg-primary text-primary-foreground rounded-br-md"
-                    : "bg-card text-foreground shadow-warm rounded-bl-md"
+                    ? "rounded-br-md bg-primary text-primary-foreground"
+                    : "rounded-bl-md bg-card text-foreground shadow-warm"
                 }`}
               >
                 {msg.text}
@@ -369,7 +411,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
 
         {(isGenerating || isTranscribing) && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-            <div className="flex items-center gap-2 rounded-2xl bg-card px-4 py-3 shadow-warm rounded-bl-md">
+            <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-card px-4 py-3 shadow-warm">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
               <span className="text-sm text-muted-foreground">
                 {isTranscribing ? "Listening..." : "Crafting your experience..."}
@@ -379,7 +421,6 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
         )}
       </div>
 
-      {/* Input area */}
       <div className="border-t border-border p-4">
         {isDone && hasPrompts ? (
           <Button
@@ -403,7 +444,6 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
           <div className="space-y-3">
             {inputMode === "voice" ? (
               <div className="flex flex-col items-center gap-3">
-                {/* Mic button */}
                 <button
                   onMouseDown={startRecording}
                   onMouseUp={stopRecording}
@@ -412,21 +452,16 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
                   disabled={isTranscribing}
                   className={`flex h-16 w-16 items-center justify-center rounded-full transition-all ${
                     isRecording
-                      ? "bg-destructive text-destructive-foreground scale-110 animate-pulse"
+                      ? "scale-110 animate-pulse bg-destructive text-destructive-foreground"
                       : "gradient-sunrise text-primary-foreground shadow-warm hover:scale-105"
                   }`}
                 >
-                  {isRecording ? (
-                    <MicOff className="h-7 w-7" />
-                  ) : (
-                    <Mic className="h-7 w-7" />
-                  )}
+                  {isRecording ? <MicOff className="h-7 w-7" /> : <Mic className="h-7 w-7" />}
                 </button>
                 <p className="text-xs text-muted-foreground">
                   {isRecording ? "Release to send" : "Hold to speak"}
                 </p>
 
-                {/* Switch to text */}
                 <button
                   onClick={() => setInputMode("text")}
                   className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
@@ -457,7 +492,6 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
                   </Button>
                 </div>
 
-                {/* Switch to voice */}
                 <button
                   onClick={() => setInputMode("voice")}
                   className="mx-auto flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
@@ -475,7 +509,6 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
         )}
       </div>
 
-      {/* Speaking indicator */}
       {isSpeaking && (
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2">
           <div className="flex items-center gap-1.5 rounded-full bg-card/90 px-3 py-1.5 shadow-warm backdrop-blur-sm">
