@@ -29,6 +29,7 @@ const App = () => (
           <Route path="/journal" element={<Journal />} />
           <Route path="/journal/new" element={<JournalNew />} />
           <Route path="/stats" element={<Stats />} />
+          <Route path="/learn" element={<Learn />} />
           <Route path="/callback" element={<SpotifyCallback />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
