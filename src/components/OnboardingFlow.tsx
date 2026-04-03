@@ -133,7 +133,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                 <Button
                   size="lg"
                   variant="outline"
-                  onClick={handleFinish}
+                  onClick={() => setStep("listen")}
                   className="w-full rounded-full"
                 >
                   Nope, I'm ready to walk!
