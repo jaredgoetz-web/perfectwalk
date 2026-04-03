@@ -1,9 +1,10 @@
 import { NavLink } from "react-router-dom";
-import { Home, Music, BookOpen, BarChart3 } from "lucide-react";
+import { Home, Music, BookOpen, BarChart3, Headphones } from "lucide-react";
 
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
   { to: "/playlists", icon: Music, label: "Playlists" },
+  { to: "/learn", icon: Headphones, label: "Learn" },
   { to: "/journal", icon: BookOpen, label: "Journal" },
   { to: "/stats", icon: BarChart3, label: "Stats" },
 ];

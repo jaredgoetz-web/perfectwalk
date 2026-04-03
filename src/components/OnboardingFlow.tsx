@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, Play, Mail, ArrowRight, X, CheckCircle } from "lucide-react";
+import { BookOpen, Play, Pause, Mail, ArrowRight, X, CheckCircle, Headphones } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type Step =
@@ -8,6 +8,7 @@ type Step =
   | "read-yes-videos"
   | "read-no"
   | "videos"
+  | "listen"
   | "email-sent";
 
 interface OnboardingFlowProps {
@@ -30,6 +31,22 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   const [step, setStep] = useState<Step>("welcome");
   const [email, setEmail] = useState("");
   const [emailSubmitted, setEmailSubmitted] = useState(false);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const toggleAudio = () => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio("/audio/intro-lesson.mp3");
+      audioRef.current.addEventListener("ended", () => setIsAudioPlaying(false));
+    }
+    if (isAudioPlaying) {
+      audioRef.current.pause();
+      setIsAudioPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsAudioPlaying(true);
+    }
+  };
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,7 +133,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                 <Button
                   size="lg"
                   variant="outline"
-                  onClick={handleFinish}
+                  onClick={() => setStep("listen")}
                   className="w-full rounded-full"
                 >
                   Nope, I'm ready to walk!
@@ -230,12 +247,63 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
 
               <Button
                 size="lg"
-                onClick={handleFinish}
+                onClick={() => setStep("listen")}
                 className="w-full gap-2 rounded-full gradient-sunrise text-primary-foreground shadow-warm"
               >
-                I'm Ready to Walk
+                One More Thing…
                 <ArrowRight className="h-4 w-4" />
               </Button>
+            </motion.div>
+          )}
+
+          {/* ─── Listen to Intro Audio ─── */}
+          {step === "listen" && (
+            <motion.div key="listen" {...fadeSlide} className="space-y-6 text-center">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/15">
+                <Headphones className="h-9 w-9 text-primary" />
+              </div>
+              <div>
+                <h2 className="font-display text-2xl font-bold text-foreground">
+                  Listen Before You Walk
+                </h2>
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                  This short audio introduction will set the tone for your very first walk. We highly recommend it.
+                </p>
+              </div>
+
+              <button
+                onClick={toggleAudio}
+                className="mx-auto flex items-center gap-3 rounded-2xl border border-border bg-card px-6 py-4 shadow-elevated transition-all hover:shadow-warm"
+              >
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full shadow-warm"
+                  style={{ background: "linear-gradient(135deg, hsl(38 90% 55%), hsl(28 85% 50%))" }}
+                >
+                  {isAudioPlaying ? (
+                    <Pause className="h-5 w-5 text-primary-foreground" />
+                  ) : (
+                    <Play className="h-5 w-5 text-primary-foreground ml-0.5" />
+                  )}
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-foreground">Introduction to The Perfect Walk</p>
+                  <p className="text-xs text-muted-foreground">Tap to {isAudioPlaying ? "pause" : "listen"}</p>
+                </div>
+              </button>
+
+              <div className="flex flex-col gap-3 pt-2">
+                <Button
+                  size="lg"
+                  onClick={handleFinish}
+                  className="w-full gap-2 rounded-full gradient-sunrise text-primary-foreground shadow-warm"
+                >
+                  I'm Ready to Walk
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  You can always find this and more lessons in the <span className="font-semibold text-foreground">Learn</span> tab.
+                </p>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
