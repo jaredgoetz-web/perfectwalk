@@ -76,58 +76,84 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Speak assistant message via TTS
-  const speakText = useCallback(async (text: string) => {
-    // Strip emojis for cleaner TTS
-    const cleanText = text.replace(/[\u{1F600}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu, "").trim();
-    if (!cleanText) return;
+  // Queue-based TTS to prevent overlapping audio
+  const ttsQueueRef = useRef<string[]>([]);
+  const isProcessingTTSRef = useRef(false);
 
-    try {
-      setIsSpeaking(true);
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ text: cleanText }),
-        }
-      );
+  const processTTSQueue = useCallback(async () => {
+    if (isProcessingTTSRef.current || ttsQueueRef.current.length === 0) return;
+    isProcessingTTSRef.current = true;
 
-      if (!response.ok) throw new Error("TTS failed");
+    while (ttsQueueRef.current.length > 0) {
+      const text = ttsQueueRef.current.shift()!;
+      const cleanText = text.replace(/[\u{1F600}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu, "").trim();
+      if (!cleanText) continue;
 
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      currentAudioRef.current = audio;
-      audio.addEventListener("ended", () => {
+      try {
+        setIsSpeaking(true);
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            },
+            body: JSON.stringify({ text: cleanText }),
+          }
+        );
+
+        if (!response.ok) throw new Error("TTS failed");
+
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        currentAudioRef.current = audio;
+
+        await new Promise<void>((resolve) => {
+          audio.addEventListener("ended", () => {
+            setIsSpeaking(false);
+            currentAudioRef.current = null;
+            resolve();
+          });
+          audio.addEventListener("error", () => {
+            setIsSpeaking(false);
+            currentAudioRef.current = null;
+            resolve();
+          });
+          audio.play().catch(() => {
+            setIsSpeaking(false);
+            currentAudioRef.current = null;
+            resolve();
+          });
+        });
+      } catch (err) {
+        console.error("TTS error:", err);
         setIsSpeaking(false);
-        currentAudioRef.current = null;
-      });
-      await audio.play();
-    } catch (err) {
-      console.error("TTS error:", err);
-      setIsSpeaking(false);
+      }
     }
+
+    isProcessingTTSRef.current = false;
   }, []);
+
+  const speakText = useCallback((text: string) => {
+    ttsQueueRef.current.push(text);
+    processTTSQueue();
+  }, [processTTSQueue]);
 
   // Show first question after intro
   useEffect(() => {
-    const t1 = setTimeout(() => {
-      speakText(messages[0].text);
-    }, 300);
+    speakText(messages[0].text);
 
-    const t2 = setTimeout(() => {
+    const t = setTimeout(() => {
       const q = QUESTIONS[0].question;
       setMessages((prev) => [...prev, { role: "assistant", text: q }]);
       speakText(q);
     }, 800);
 
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
+      clearTimeout(t);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
