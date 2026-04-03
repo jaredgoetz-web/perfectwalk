@@ -10,6 +10,7 @@ import Playlists from "./pages/Playlists";
 import Journal from "./pages/Journal";
 import JournalNew from "./pages/JournalNew";
 import Stats from "./pages/Stats";
+import Learn from "./pages/Learn";
 import SpotifyCallback from "./pages/SpotifyCallback";
 import NotFound from "./pages/NotFound";
 
