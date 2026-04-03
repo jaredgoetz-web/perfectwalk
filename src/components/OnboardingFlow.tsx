@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, Play, Mail, ArrowRight, X, CheckCircle } from "lucide-react";
+import { BookOpen, Play, Pause, Mail, ArrowRight, X, CheckCircle, Headphones } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type Step =
@@ -8,6 +8,7 @@ type Step =
   | "read-yes-videos"
   | "read-no"
   | "videos"
+  | "listen"
   | "email-sent";
 
 interface OnboardingFlowProps {
