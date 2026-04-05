@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      coach_messages: {
+        Row: {
+          content: string
+          created_at: string
+          device_id: string
+          id: string
+          role: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          device_id: string
+          id?: string
+          role: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          device_id?: string
+          id?: string
+          role?: string
+        }
+        Relationships: []
+      }
       user_personalization: {
         Row: {
           answers: Json
