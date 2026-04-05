@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, Play, Pause, Mail, ArrowRight, X, CheckCircle, Headphones } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,19 +34,37 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const stopAudio = useCallback(() => {
+    if (!audioRef.current) return;
+    audioRef.current.pause();
+    audioRef.current.currentTime = 0;
+    setIsAudioPlaying(false);
+  }, []);
+
   const toggleAudio = () => {
     if (!audioRef.current) {
       audioRef.current = new Audio("/audio/intro-lesson.mp3");
       audioRef.current.addEventListener("ended", () => setIsAudioPlaying(false));
     }
     if (isAudioPlaying) {
-      audioRef.current.pause();
-      setIsAudioPlaying(false);
+      stopAudio();
     } else {
       audioRef.current.play();
       setIsAudioPlaying(true);
     }
   };
+
+  useEffect(() => {
+    if (step !== "listen") {
+      stopAudio();
+    }
+  }, [step, stopAudio]);
+
+  useEffect(() => {
+    return () => {
+      stopAudio();
+    };
+  }, [stopAudio]);
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,6 +75,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   };
 
   const handleFinish = () => {
+    stopAudio();
     localStorage.setItem("tpw_onboarded", "true");
     onComplete();
   };
