@@ -333,6 +333,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
         setShowQuestion(true);
       }, 600);
     } else {
+      setCurrentQ(nextQ);
       window.setTimeout(() => {
         const doneText = `Beautiful, ${newAnswers.name || "friend"}! ✨ Let me craft your personalized walk experience...`;
         setMessages((prev) => [...prev, { role: "assistant", text: doneText }]);
