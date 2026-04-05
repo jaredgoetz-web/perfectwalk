@@ -79,10 +79,15 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
   const currentAudioUrlRef = useRef<string | null>(null);
   const ttsQueueRef = useRef<string[]>([]);
   const isProcessingTTSRef = useRef(false);
+  const activeTTSRequestRef = useRef<AbortController | null>(null);
+  const ttsSessionRef = useRef(0);
   const didInitRef = useRef(false);
   const isUnmountedRef = useRef(false);
 
   const stopCurrentAudio = useCallback(() => {
+    activeTTSRequestRef.current?.abort();
+    activeTTSRequestRef.current = null;
+
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
       currentAudioRef.current.currentTime = 0;
@@ -100,6 +105,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
   }, []);
 
   const resetTTS = useCallback(() => {
+    ttsSessionRef.current += 1;
     ttsQueueRef.current = [];
     isProcessingTTSRef.current = false;
     stopCurrentAudio();
@@ -110,21 +116,29 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
       return;
     }
 
+    const sessionId = ttsSessionRef.current;
     isProcessingTTSRef.current = true;
 
-    while (ttsQueueRef.current.length > 0 && !isUnmountedRef.current) {
-      const text = ttsQueueRef.current.shift();
-      if (!text) continue;
+    try {
+      while (
+        ttsQueueRef.current.length > 0 &&
+        !isUnmountedRef.current &&
+        sessionId === ttsSessionRef.current
+      ) {
+        const text = ttsQueueRef.current.shift();
+        if (!text) continue;
 
-      const cleanText = text
-        .replace(/[\u{1F600}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu, "")
-        .trim();
+        const cleanText = text
+          .replace(/[{1F600}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu, "")
+          .trim();
 
-      if (!cleanText) continue;
+        if (!cleanText) continue;
 
-      try {
         stopCurrentAudio();
         setIsSpeaking(true);
+
+        const controller = new AbortController();
+        activeTTSRequestRef.current = controller;
 
         const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
           method: "POST",
@@ -134,15 +148,25 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
           body: JSON.stringify({ text: cleanText, voiceId: CUSTOM_VOICE_ID }),
+          signal: controller.signal,
         });
+
+        if (sessionId !== ttsSessionRef.current || isUnmountedRef.current) {
+          break;
+        }
 
         if (!response.ok) throw new Error(`TTS failed: ${response.status}`);
 
         const audioBlob = await response.blob();
+        if (sessionId !== ttsSessionRef.current || isUnmountedRef.current) {
+          break;
+        }
+
         const audioUrl = URL.createObjectURL(audioBlob);
         currentAudioUrlRef.current = audioUrl;
 
         const audio = new Audio(audioUrl);
+        audio.preload = "auto";
         currentAudioRef.current = audio;
 
         await new Promise<void>((resolve) => {
@@ -154,6 +178,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
 
           audio.onended = cleanup;
           audio.onerror = cleanup;
+
           audio.play().catch(cleanup);
         });
 
@@ -166,14 +191,19 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
           currentAudioUrlRef.current = null;
         }
 
+        activeTTSRequestRef.current = null;
         setIsSpeaking(false);
-      } catch (err) {
-        console.error("TTS error:", err);
-        stopCurrentAudio();
       }
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        console.error("TTS error:", err);
+      }
+      stopCurrentAudio();
+    } finally {
+      activeTTSRequestRef.current = null;
+      setIsSpeaking(false);
+      isProcessingTTSRef.current = false;
     }
-
-    isProcessingTTSRef.current = false;
   }, [stopCurrentAudio]);
 
   const speakText = useCallback(
@@ -203,8 +233,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
     return () => {
       window.clearTimeout(t);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [messages, speakText]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
