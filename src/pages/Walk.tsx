@@ -6,6 +6,14 @@ import { Play, Pause, SkipForward, Check, X, ListMusic, Sparkles, ChevronRight, 
 import { Button } from "@/components/ui/button";
 import WalkPhaseCard, { walkPhases } from "@/components/WalkPhaseCard";
 import { saveWalkEntry, WalkEntry } from "@/lib/walkStore";
+import {
+  getPhaseGuidance,
+  getGuidanceMode,
+  setGuidanceMode,
+  resetSessionSeed,
+  GuidanceMode,
+} from "@/lib/phasePrompts";
+import { useCoachVoice } from "@/hooks/useCoachVoice";
 import SpotifyEmbed from "@/components/SpotifyEmbed";
 import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
 import { isLoggedIn as isSpotifyLoggedIn, loginWithSpotify, logout as spotifyLogout, fetchSpotifyProfile } from "@/lib/spotifyAuth";
@@ -41,7 +49,12 @@ const Walk = () => {
   const [currentPhase, setCurrentPhase] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [completedPhases, setCompletedPhases] = useState<number[]>([]);
+  const [guidanceMode, setGuidanceModeState] = useState<GuidanceMode>(getGuidanceMode());
+  const [coachSpeaking, setCoachSpeaking] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const coach = useCoachVoice();
+  const spokenPhasesRef = useRef<Set<number>>(new Set());
+  const midPhaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Spotify state
   const [spotifyConnected, setSpotifyConnected] = useState(isSpotifyLoggedIn());
@@ -156,13 +169,94 @@ const Walk = () => {
     });
   }, [useSDK, currentPhase]);
 
+  // ─── Coach Voice: speak guidance prompts over music ───
+  useEffect(() => {
+    if (!isWalking || guidanceMode === "minimal") return;
+    const phaseId = walkPhases[currentPhase].id;
+
+    // Don't repeat for a phase we already spoke
+    if (spokenPhasesRef.current.has(phaseId)) return;
+    spokenPhasesRef.current.add(phaseId);
+
+    // Build what to say: phase intro + guidance prompt
+    const phaseName = walkPhases[currentPhase].title;
+
+    // Get the primary prompt for this phase
+    let prompt = "";
+    try {
+      const personalized = JSON.parse(localStorage.getItem("tpw_phase_prompts") || "{}");
+      prompt = personalized[String(phaseId)] || "";
+    } catch {}
+    if (!prompt) {
+      const defaults = getPhaseGuidance(phaseId, "moderate");
+      prompt = defaults[0] || "";
+    }
+
+    // Speak after a brief pause to let the phase transition settle
+    const speakTimeout = setTimeout(async () => {
+      const intro = currentPhase === 0
+        ? `${phaseName}. ${prompt}`
+        : `Moving into ${phaseName}. ${prompt}`;
+
+      setCoachSpeaking(true);
+      await coach.speak(intro);
+      setCoachSpeaking(false);
+
+      // In rich mode, speak a second prompt mid-phase (~90 seconds in)
+      if (guidanceMode === "rich") {
+        const defaults = getPhaseGuidance(phaseId, "rich");
+        const secondPrompt = defaults[1] || defaults[0] || "";
+        if (secondPrompt && secondPrompt !== prompt) {
+          midPhaseTimerRef.current = setTimeout(async () => {
+            setCoachSpeaking(true);
+            await coach.speak(secondPrompt);
+            setCoachSpeaking(false);
+          }, 90_000); // 90 seconds into the phase
+        }
+      }
+    }, 2000);
+
+    return () => {
+      clearTimeout(speakTimeout);
+      if (midPhaseTimerRef.current) {
+        clearTimeout(midPhaseTimerRef.current);
+        midPhaseTimerRef.current = null;
+      }
+    };
+  }, [currentPhase, isWalking, guidanceMode]);
+
+  // Stop coach voice on pause or unmount
+  useEffect(() => {
+    if (!isWalking) {
+      coach.stop();
+      setCoachSpeaking(false);
+      if (midPhaseTimerRef.current) {
+        clearTimeout(midPhaseTimerRef.current);
+        midPhaseTimerRef.current = null;
+      }
+    }
+  }, [isWalking]);
+
+  useEffect(() => {
+    return () => {
+      coach.stop();
+      if (midPhaseTimerRef.current) clearTimeout(midPhaseTimerRef.current);
+    };
+  }, []);
+
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
-  const handleStart = () => setIsWalking(true);
+  const handleStart = () => {
+    if (elapsed === 0) {
+      resetSessionSeed(); // new walk = new prompts
+      spokenPhasesRef.current.clear(); // reset spoken phases for new walk
+    }
+    setIsWalking(true);
+  };
   const handlePause = () => setIsWalking(false);
 
   const handleNextPhase = useCallback(() => {
@@ -417,18 +511,47 @@ const Walk = () => {
             </h2>
             <p className="mt-1 text-muted-foreground">{phase.subtitle}</p>
             {(() => {
+              if (guidanceMode === "minimal") return null;
+
+              const prompts: string[] = [];
+
+              // Get personalized prompt if available
               try {
-                const prompts = JSON.parse(localStorage.getItem("tpw_phase_prompts") || "{}");
-                const prompt = prompts[String(phase.id)];
-                if (prompt) {
-                  return (
-                    <p className="mt-3 text-sm italic leading-relaxed text-foreground/80 max-w-xs mx-auto">
-                      "{prompt}"
-                    </p>
-                  );
-                }
+                const personalized = JSON.parse(localStorage.getItem("tpw_phase_prompts") || "{}");
+                const personalPrompt = personalized[String(phase.id)];
+                if (personalPrompt) prompts.push(personalPrompt);
               } catch {}
-              return null;
+
+              // Get default guidance prompts
+              const defaults = getPhaseGuidance(phase.id, guidanceMode);
+
+              if (guidanceMode === "moderate") {
+                // Show personalized if available, otherwise 1 default
+                const show = prompts.length > 0 ? prompts : defaults.slice(0, 1);
+                if (show.length === 0) return null;
+                return (
+                  <div className="mt-3 space-y-2 max-w-xs mx-auto">
+                    {show.map((text, i) => (
+                      <p key={i} className="text-sm italic leading-relaxed text-foreground/80">
+                        "{text}"
+                      </p>
+                    ))}
+                  </div>
+                );
+              }
+
+              // Rich: show personalized + defaults (deduplicated)
+              const allPrompts = [...prompts, ...defaults.filter((d) => !prompts.includes(d))].slice(0, 3);
+              if (allPrompts.length === 0) return null;
+              return (
+                <div className="mt-3 space-y-2 max-w-xs mx-auto">
+                  {allPrompts.map((text, i) => (
+                    <p key={i} className="text-sm italic leading-relaxed text-foreground/80">
+                      "{text}"
+                    </p>
+                  ))}
+                </div>
+              );
             })()}
           </motion.div>
         </AnimatePresence>
@@ -436,6 +559,30 @@ const Walk = () => {
         <p className="relative z-10 mt-6 font-display text-5xl font-bold tabular-nums text-foreground">
           {formatTime(elapsed)}
         </p>
+
+        {/* Coach speaking indicator */}
+        <AnimatePresence>
+          {coachSpeaking && (
+            <motion.div
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              className="relative z-10 mt-3 flex items-center justify-center gap-1.5"
+            >
+              <div className="flex gap-0.5">
+                {[0, 1, 2].map((i) => (
+                  <motion.div
+                    key={i}
+                    className="w-1 rounded-full bg-primary"
+                    animate={{ height: [6, 16, 6] }}
+                    transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
+                  />
+                ))}
+              </div>
+              <span className="text-xs text-muted-foreground">Coach speaking</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Controls */}
@@ -519,8 +666,31 @@ const Walk = () => {
         </div>
       )}
 
+      {/* Guidance mode toggle */}
+      <div className="mx-auto mt-6 max-w-lg px-5">
+        <div className="flex items-center justify-center gap-1 rounded-full bg-secondary/60 p-1">
+          {(["minimal", "moderate", "rich"] as GuidanceMode[]).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => {
+                setGuidanceModeState(mode);
+                setGuidanceMode(mode);
+              }}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium capitalize transition-all ${
+                guidanceMode === mode
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1.5 text-center text-[11px] text-muted-foreground">Guidance level</p>
+      </div>
+
       {/* Phase list */}
-      <div className="mx-auto mt-8 max-w-lg space-y-2 px-5">
+      <div className="mx-auto mt-6 max-w-lg space-y-2 px-5">
         {walkPhases.map((p, i) => (
           <WalkPhaseCard
             key={p.id}

@@ -59,7 +59,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "assistant",
-      text: "Hey! 👋 I'd love to learn a bit about you so I can make your walk experience deeply personal. It'll only take a minute.",
+      text: "Hey! I'd love to learn a bit about you so I can make your walk experience deeply personal. It'll only take a minute.",
     },
   ]);
   const [currentQ, setCurrentQ] = useState(0);
@@ -68,13 +68,15 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
   const [isGenerating, setIsGenerating] = useState(false);
   const [showQuestion, setShowQuestion] = useState(true);
   const [inputMode, setInputMode] = useState<"voice" | "text">("voice");
-  const [isRecording, setIsRecording] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [autoListenPending, setAutoListenPending] = useState(false);
+  const currentQRef = useRef(0);
+  const answersRef = useRef<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const recognitionRef = useRef<any>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const currentAudioUrlRef = useRef<string | null>(null);
   const ttsQueueRef = useRef<string[]>([]);
@@ -83,6 +85,8 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
   const ttsSessionRef = useRef(0);
   const didInitRef = useRef(false);
   const isUnmountedRef = useRef(false);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transcriptRef = useRef("");
 
   const stopCurrentAudio = useCallback(() => {
     activeTTSRequestRef.current?.abort();
@@ -151,16 +155,11 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
           signal: controller.signal,
         });
 
-        if (sessionId !== ttsSessionRef.current || isUnmountedRef.current) {
-          break;
-        }
-
+        if (sessionId !== ttsSessionRef.current || isUnmountedRef.current) break;
         if (!response.ok) throw new Error(`TTS failed: ${response.status}`);
 
         const audioBlob = await response.blob();
-        if (sessionId !== ttsSessionRef.current || isUnmountedRef.current) {
-          break;
-        }
+        if (sessionId !== ttsSessionRef.current || isUnmountedRef.current) break;
 
         const audioUrl = URL.createObjectURL(audioBlob);
         currentAudioUrlRef.current = audioUrl;
@@ -175,17 +174,12 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
             audio.onerror = null;
             resolve();
           };
-
           audio.onended = cleanup;
           audio.onerror = cleanup;
-
           audio.play().catch(cleanup);
         });
 
-        if (currentAudioRef.current === audio) {
-          currentAudioRef.current = null;
-        }
-
+        if (currentAudioRef.current === audio) currentAudioRef.current = null;
         if (currentAudioUrlRef.current === audioUrl) {
           URL.revokeObjectURL(audioUrl);
           currentAudioUrlRef.current = null;
@@ -203,20 +197,136 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
       activeTTSRequestRef.current = null;
       setIsSpeaking(false);
       isProcessingTTSRef.current = false;
+
+      // Auto-start listening after TTS finishes speaking
+      if (!isUnmountedRef.current) {
+        setAutoListenPending(true);
+      }
     }
   }, [stopCurrentAudio]);
 
   const speakText = useCallback(
     (text: string, options?: { interrupt?: boolean }) => {
-      if (options?.interrupt) {
-        resetTTS();
-      }
-
+      if (options?.interrupt) resetTTS();
       ttsQueueRef.current.push(text);
       void processTTSQueue();
     },
     [processTTSQueue, resetTTS]
   );
+
+  // Auto-start listening after TTS finishes
+  useEffect(() => {
+    if (
+      autoListenPending &&
+      inputMode === "voice" &&
+      showQuestion &&
+      currentQ < QUESTIONS.length &&
+      !isListening &&
+      !isSpeaking &&
+      !isGenerating
+    ) {
+      setAutoListenPending(false);
+      const t = setTimeout(() => startListening(), 400);
+      return () => clearTimeout(t);
+    }
+    if (autoListenPending) setAutoListenPending(false);
+  }, [autoListenPending, inputMode, showQuestion, currentQ, isListening, isSpeaking, isGenerating]);
+
+  // Start continuous speech recognition — auto-submits after silence
+  const startListening = useCallback(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setInputMode("text");
+      return;
+    }
+
+    // Stop any ongoing TTS
+    resetTTS();
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+    transcriptRef.current = "";
+
+    recognition.onresult = (event: any) => {
+      let finalTranscript = "";
+      let interimTranscript = "";
+      for (let i = 0; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+
+      const fullText = (finalTranscript + interimTranscript).trim();
+      transcriptRef.current = fullText;
+
+      // Reset silence timer on each speech result
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
+      if (fullText) {
+        // After 2 seconds of silence, auto-submit
+        silenceTimerRef.current = setTimeout(() => {
+          const text = transcriptRef.current.trim();
+          if (text && recognitionRef.current) {
+            recognitionRef.current.stop();
+          }
+        }, 2000);
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+      const text = transcriptRef.current.trim();
+      if (text) {
+        processAnswer(text);
+      }
+      recognitionRef.current = null;
+    };
+
+    recognition.onerror = (event: any) => {
+      // "no-speech" is normal — user just didn't say anything yet
+      if (event.error !== "no-speech") {
+        console.error("Speech error:", event.error);
+      }
+      setIsListening(false);
+      recognitionRef.current = null;
+    };
+
+    try {
+      recognition.start();
+      recognitionRef.current = recognition;
+      setIsListening(true);
+    } catch {
+      setInputMode("text");
+    }
+  }, [resetTTS]);
+
+  const stopListening = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+  }, []);
+
+  const toggleListening = useCallback(() => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  }, [isListening, startListening, stopListening]);
 
   useEffect(() => {
     if (didInitRef.current) return;
@@ -230,9 +340,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
       speakText(q);
     }, 800);
 
-    return () => {
-      window.clearTimeout(t);
-    };
+    return () => window.clearTimeout(t);
   }, [messages, speakText]);
 
   useEffect(() => {
@@ -247,101 +355,52 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
     return () => {
       isUnmountedRef.current = true;
       resetTTS();
+      if (recognitionRef.current) recognitionRef.current.stop();
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     };
   }, [resetTTS]);
 
-  const startRecording = async () => {
-    try {
-      resetTTS();
+  // Keep refs in sync with state so callbacks always read fresh values
+  useEffect(() => {
+    currentQRef.current = currentQ;
+  }, [currentQ]);
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
-        await transcribeAudio(audioBlob);
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch (err) {
-      console.error("Mic error:", err);
-      setInputMode("text");
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
-
-  const transcribeAudio = async (audioBlob: Blob) => {
-    setIsTranscribing(true);
-    try {
-      const formData = new FormData();
-      formData.append("audio", audioBlob, "recording.webm");
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-stt`, {
-        method: "POST",
-        headers: {
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error("STT failed");
-
-      const data = await response.json();
-      const text = data.text?.trim();
-
-      if (text) {
-        processAnswer(text);
-      }
-    } catch (err) {
-      console.error("STT error:", err);
-    } finally {
-      setIsTranscribing(false);
-    }
-  };
-
-  const processAnswer = async (value: string) => {
-    const q = QUESTIONS[currentQ];
-    const newAnswers = { ...answers, [q.key]: value };
+  const processAnswer = useCallback((value: string) => {
+    const qIndex = currentQRef.current;
+    const q = QUESTIONS[qIndex];
+    if (!q) return; // safety check
+    const newAnswers = { ...answersRef.current, [q.key]: value };
+    answersRef.current = newAnswers;
     setAnswers(newAnswers);
     setInput("");
     setShowQuestion(false);
     setMessages((prev) => [...prev, { role: "user", text: value }]);
 
-    const nextQ = currentQ + 1;
+    const nextQ = qIndex + 1;
 
     if (nextQ < QUESTIONS.length) {
       window.setTimeout(() => {
         const nextText = QUESTIONS[nextQ].question;
         setMessages((prev) => [...prev, { role: "assistant", text: nextText }]);
         speakText(nextText, { interrupt: true });
+        currentQRef.current = nextQ;
         setCurrentQ(nextQ);
         setShowQuestion(true);
       }, 600);
     } else {
+      currentQRef.current = nextQ;
       setCurrentQ(nextQ);
       window.setTimeout(() => {
-        const doneText = `Beautiful, ${newAnswers.name || "friend"}! ✨ Let me craft your personalized walk experience...`;
+        const doneText = `Beautiful, ${newAnswers.name || "friend"}! Let me craft your personalized walk experience...`;
         setMessages((prev) => [...prev, { role: "assistant", text: doneText }]);
         speakText(doneText, { interrupt: true });
         generatePrompts(newAnswers);
       }, 600);
     }
-  };
+  }, [speakText]);
 
   const handleSend = () => {
     const value = input.trim();
@@ -349,6 +408,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
     processAnswer(value);
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- called from setTimeout in processAnswer, hoisted
   const generatePrompts = async (finalAnswers: Record<string, string>) => {
     setIsGenerating(true);
     try {
@@ -370,10 +430,15 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
       localStorage.setItem("tpw_phase_prompts", JSON.stringify(prompts));
       localStorage.setItem("tpw_personalized", "true");
 
-      const readyText = "Your walk is now personalized! 🌅 Each phase will have prompts crafted just for you. Ready to take your first Perfect Walk?";
+      const readyText = "Your walk is ready. Each phase is now crafted just for you. Taking you there now...";
       setMessages((prev) => [...prev, { role: "assistant", text: readyText }]);
       speakText(readyText, { interrupt: true });
       setIsGenerating(false);
+
+      // Auto-navigate to the personalized walk after a brief pause
+      setTimeout(() => {
+        if (!isUnmountedRef.current) onComplete();
+      }, 3000);
     } catch (err) {
       console.error("Failed to generate prompts:", err);
       setIsGenerating(false);
@@ -381,9 +446,14 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
       localStorage.setItem("tpw_personalization_answers", JSON.stringify(finalAnswers));
       localStorage.setItem("tpw_personalized", "true");
 
-      const fallbackText = "I saved your info! I'll personalize your walk prompts next time. For now, you'll get the standard experience — still amazing! 🌟";
+      const fallbackText = "I saved your info. I'll personalize your prompts next time — for now, let's walk with the standard experience.";
       setMessages((prev) => [...prev, { role: "assistant", text: fallbackText }]);
       speakText(fallbackText, { interrupt: true });
+
+      // Auto-navigate even on fallback
+      setTimeout(() => {
+        if (!isUnmountedRef.current) onComplete();
+      }, 3000);
     }
   };
 
@@ -395,7 +465,6 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
   };
 
   const isDone = currentQ >= QUESTIONS.length && !isGenerating;
-  const hasPrompts = localStorage.getItem("tpw_phase_prompts");
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -439,61 +508,79 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
           ))}
         </AnimatePresence>
 
-        {(isGenerating || isTranscribing) && (
+        {isGenerating && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
             <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-card px-4 py-3 shadow-warm">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
               <span className="text-sm text-muted-foreground">
-                {isTranscribing ? "Listening..." : "Crafting your experience..."}
+                Crafting your experience...
               </span>
             </div>
           </motion.div>
         )}
       </div>
 
+      {/* Input area */}
       <div className="border-t border-border p-4">
-        {isDone && hasPrompts ? (
-          <Button
-            size="lg"
-            onClick={onComplete}
-            className="w-full gap-2 rounded-full gradient-sunrise text-primary-foreground shadow-warm"
-          >
-            Start My Personalized Walk
-            <ArrowRight className="h-4 w-4" />
-          </Button>
-        ) : isDone ? (
-          <Button
-            size="lg"
-            onClick={onComplete}
-            className="w-full gap-2 rounded-full gradient-sunrise text-primary-foreground shadow-warm"
-          >
-            Continue to Walk
-            <ArrowRight className="h-4 w-4" />
-          </Button>
+        {isDone ? (
+          // Auto-navigating — show subtle transition state
+          <div className="flex items-center justify-center gap-2 py-3">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span className="text-sm text-muted-foreground">Preparing your walk...</span>
+          </div>
         ) : showQuestion && currentQ < QUESTIONS.length ? (
           <div className="space-y-3">
             {inputMode === "voice" ? (
               <div className="flex flex-col items-center gap-3">
+                {/* Tap-to-toggle mic — auto-listens after AI speaks */}
                 <button
-                  onMouseDown={startRecording}
-                  onMouseUp={stopRecording}
-                  onTouchStart={startRecording}
-                  onTouchEnd={stopRecording}
-                  disabled={isTranscribing}
+                  onClick={toggleListening}
+                  disabled={isSpeaking}
                   className={`flex h-16 w-16 items-center justify-center rounded-full transition-all ${
-                    isRecording
-                      ? "scale-110 animate-pulse bg-destructive text-destructive-foreground"
+                    isListening
+                      ? "scale-110 bg-destructive text-destructive-foreground"
+                      : isSpeaking
+                      ? "opacity-50 gradient-sunrise text-primary-foreground"
                       : "gradient-sunrise text-primary-foreground shadow-warm hover:scale-105"
                   }`}
                 >
-                  {isRecording ? <MicOff className="h-7 w-7" /> : <Mic className="h-7 w-7" />}
+                  {isListening ? <MicOff className="h-7 w-7" /> : <Mic className="h-7 w-7" />}
                 </button>
                 <p className="text-xs text-muted-foreground">
-                  {isRecording ? "Release to send" : "Hold to speak"}
+                  {isSpeaking
+                    ? "Listening to your guide..."
+                    : isListening
+                    ? "Speak naturally — I'll know when you're done"
+                    : "Tap to speak"}
                 </p>
 
+                {/* Listening animation */}
+                {isListening && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex gap-1"
+                  >
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <motion.div
+                        key={i}
+                        className="w-1 rounded-full bg-primary"
+                        animate={{ height: [8, 20, 8] }}
+                        transition={{
+                          duration: 0.8,
+                          repeat: Infinity,
+                          delay: i * 0.1,
+                        }}
+                      />
+                    ))}
+                  </motion.div>
+                )}
+
                 <button
-                  onClick={() => setInputMode("text")}
+                  onClick={() => {
+                    stopListening();
+                    setInputMode("text");
+                  }}
                   className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
                 >
                   <Keyboard className="h-3.5 w-3.5" />

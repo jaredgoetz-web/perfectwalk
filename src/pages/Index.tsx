@@ -126,19 +126,6 @@ const Index = () => {
         </motion.div>
       </div>
 
-      {/* Temporary reset button */}
-      <button
-        onClick={() => {
-          localStorage.removeItem("tpw_onboarded");
-          localStorage.removeItem("tpw_personalized");
-          localStorage.removeItem("tpw_phase_prompts");
-          localStorage.removeItem("tpw_personalization_answers");
-          window.location.reload();
-        }}
-        className="fixed bottom-20 right-4 z-40 rounded-full bg-destructive px-3 py-1.5 text-xs text-destructive-foreground shadow-lg"
-      >
-        Reset Onboarding
-      </button>
     </div>
   );
 };
