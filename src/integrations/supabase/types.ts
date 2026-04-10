@@ -65,6 +65,42 @@ export type Database = {
         }
         Relationships: []
       }
+      walk_entries: {
+        Row: {
+          created_at: string
+          date: string
+          device_id: string
+          duration_minutes: number | null
+          id: string
+          mood: string | null
+          reflection_q1: string | null
+          reflection_q2: string | null
+          reflection_q3: string | null
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          device_id: string
+          duration_minutes?: number | null
+          id?: string
+          mood?: string | null
+          reflection_q1?: string | null
+          reflection_q2?: string | null
+          reflection_q3?: string | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          device_id?: string
+          duration_minutes?: number | null
+          id?: string
+          mood?: string | null
+          reflection_q1?: string | null
+          reflection_q2?: string | null
+          reflection_q3?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
