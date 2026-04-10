@@ -521,7 +521,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
       </div>
 
       {/* Input area */}
-      <div className="border-t border-border p-4" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0.5rem) + 0.5rem)" }}
+      <div className="border-t border-border p-4" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0.5rem) + 0.5rem)" }}>
         {isDone ? (
           // Auto-navigating — show subtle transition state
           <div className="flex items-center justify-center gap-2 py-3">
