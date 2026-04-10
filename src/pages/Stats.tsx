@@ -83,7 +83,7 @@ const Stats = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }}
-                className="rounded-xl bg-card p-5 shadow-warm"
+                className="rounded-2xl bg-card p-5 shadow-warm"
               >
                 <Icon className={`h-5 w-5 ${stat.color}`} />
                 <p className="mt-3 font-display text-3xl font-bold text-foreground">
@@ -102,7 +102,7 @@ const Stats = () => {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className="mt-6 rounded-xl bg-card p-5 shadow-warm"
+            className="mt-6 rounded-2xl bg-card p-5 shadow-warm"
           >
             <p className="font-display text-lg font-semibold text-foreground">
               30-Day Consistency
@@ -142,7 +142,7 @@ const Stats = () => {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="mt-4 rounded-xl bg-card p-5 shadow-warm"
+            className="mt-4 rounded-2xl bg-card p-5 shadow-warm"
           >
             <p className="font-display text-lg font-semibold text-foreground">
               Phase Frequency
@@ -178,7 +178,7 @@ const Stats = () => {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
-            className="mt-4 flex items-center gap-4 rounded-xl bg-card p-5 shadow-warm"
+            className="mt-4 flex items-center gap-4 rounded-2xl bg-card p-5 shadow-warm"
           >
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary">
               <Heart className="h-6 w-6 text-dawn-rose" />
@@ -200,7 +200,7 @@ const Stats = () => {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7 }}
-            className="mt-4 rounded-xl bg-card p-5 shadow-warm"
+            className="mt-4 rounded-2xl bg-card p-5 shadow-warm"
           >
             <p className="font-display text-lg font-semibold text-foreground">
               Recent Insights

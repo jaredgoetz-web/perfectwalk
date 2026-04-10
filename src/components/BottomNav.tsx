@@ -1,4 +1,5 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Home, Footprints, BookOpen, Sparkles, User } from "lucide-react";
 
 const navItems = [
@@ -10,15 +11,23 @@ const navItems = [
 ];
 
 const BottomNav = () => {
+  const location = useLocation();
+
+  // Hide nav during walk and post-walk reflection
+  if (location.pathname === "/walk" || location.pathname === "/journal/new") {
+    return null;
+  }
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-lg items-center justify-around py-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-background/80 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-lg items-center justify-around py-3">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
+            end={to === "/"}
             className={({ isActive }) =>
-              `flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs font-medium transition-colors ${
+              `flex flex-col items-center gap-1 px-3 py-1 text-xs font-medium transition-colors duration-300 ${
                 isActive
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"
@@ -27,8 +36,20 @@ const BottomNav = () => {
           >
             {({ isActive }) => (
               <>
-                <Icon className="h-5 w-5" strokeWidth={isActive ? 2.5 : 1.5} />
+                <motion.div
+                  animate={{ scale: isActive ? 1.15 : 1 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                >
+                  <Icon className="h-5 w-5" strokeWidth={isActive ? 2.5 : 1.5} />
+                </motion.div>
                 <span>{label}</span>
+                {isActive && (
+                  <motion.div
+                    layoutId="nav-indicator"
+                    className="h-1 w-1 rounded-full bg-primary"
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  />
+                )}
               </>
             )}
           </NavLink>

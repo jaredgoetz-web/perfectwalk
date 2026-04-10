@@ -33,74 +33,64 @@ const audioLessons: AudioLesson[] = [
 
 const writtenLessons: WrittenLesson[] = [
   {
-    id: "philosophy-state",
-    title: "State Is Everything",
-    description: "Why your emotional state matters more than your to-do list",
+    id: "philosophy-feeling",
+    title: "The Mind Is a Tool to Get to the Feeling",
+    description: "The key concept that deepens your entire practice",
     readTime: "2 min",
     category: "The Philosophy",
-    content: `Most people wake up and immediately check their phone. Before they've taken a single conscious breath, their emotional state has been hijacked by notifications, news, and other people's agendas.
+    content: `Here's the key to everything: you can use your mind as an anchor point to get into these feelings. But once you start feeling, that's when you let go of attachment to your mind and focus on the feeling itself.
 
-The Perfect Walk exists because of one core truth: your emotional state determines the quality of your decisions, your relationships, your creativity, and your presence. Not your plans. Not your productivity system. Your state.
+By focusing on the feeling, you put your energy into the feeling, and the feeling grows. So you don't actually need your mind to feel these feelings. You can use your mind as a reference point to get there.
 
-When you feel contracted — anxious, reactive, defensive — you see threats everywhere. You play small. You make fear-based decisions. When you feel expanded — open, grounded, connected — you see possibility. You act from wisdom instead of reaction.
+For example, if you want to feel love or gratitude, you may use your mind to think of a family member or a pet. But once you feel that feeling of love or gratitude, your mind is no longer needed. You focus on that feeling and let it build.
 
-This is not positive thinking. This is physics. Your nervous system literally filters reality based on your emotional state. A 25-minute walk that shifts your state from contraction to expansion changes the entire trajectory of your day.
+That's the same for all parts of this walk. Where you focus your attention and your energy is what continues to manifest and grow. Your mind is a tool to get to the feeling. Once the feeling is there, you can ditch the mind and focus on the feeling.
 
-The walk doesn't add something to your life. It removes the static that was already blocking what's true.`,
+This one concept will transform your entire practice. Master it, and every walk goes deeper.`,
   },
   {
-    id: "philosophy-mind",
-    title: "The Mind Is Not the Enemy",
-    description: "How to work with your thoughts instead of against them",
+    id: "philosophy-experience",
+    title: "Words Are Limiting. Experience Is Limitless.",
+    description: "Why doing the walk matters a thousand times more than reading about it",
     readTime: "2 min",
     category: "The Philosophy",
-    content: `Your mind is not the problem. Your relationship to your mind is.
+    content: `When you read something and comprehend it, your mind understands it. But when you take action and do something and experience the outcome, your soul understands it.
 
-The mind does what minds do: it analyzes, projects, worries, plans. It replays the past and rehearses the future. This is its job. It's a survival tool, a pattern-recognition machine, and it's very good at what it does.
+The Perfect Walk leads you to a place where you can have these experiences regularly, and they will continue to teach you deep in your soul. The experience will deepen as you practice more, and the lessons will keep coming. They'll come at a grander scale and build on top of each other.
 
-The problem starts when you believe everything it says. When you mistake the voice in your head for the truth. When the guard dog starts running the household.
+You'll learn something through one experience and be able to learn another thing only because you had the first experience that taught you what you needed. That's why practice matters. That's why consistency matters.
 
-During The Perfect Walk, you learn to use your mind as a tool rather than being used by it. In Phase 1, you use a thought — a person you love, a memory of gratitude — as an anchor to access a feeling. Then you release the thought and stay with the feeling. The feeling grows on its own when you give it space.
-
-This is the core skill: use the mind to reach the feeling, then let the mind rest. Over time, you'll notice something remarkable — the gap between thoughts gets wider. Intuition gets louder. The noise fades. What remains is clarity.`,
+You may read these words and say "I understand this already." But once you have your first click moment, you'll realize the levels of deepness go so much deeper than through reading. The difference between understanding conceptually and experiencing through doing is a thousandfold. It's not even close.`,
   },
   {
-    id: "intuition-listen",
-    title: "Listening to What You Already Know",
-    description: "Your intuition speaks quieter than fear, but it's always more accurate",
+    id: "philosophy-giant",
+    title: "The Giant Inside You",
+    description: "There's an all-powerful being inside you that's ready to wake up",
     readTime: "3 min",
-    category: "Intuition",
-    content: `Everyone has experienced intuition. A knowing that arrived before the evidence. A feeling about a person that proved right. A decision that made no logical sense but turned out to be exactly correct.
+    category: "The Philosophy",
+    content: `There's a giant inside each and every one of us. This giant is shackled by the bounds of life. It's shackled by our minds focused consistently on our problems and the numbing of our problems with actions that don't align with our true purpose. This giant is held behind the bar of scrolling on your phone. It's shackled up by taking the bite of that food you know is not good for you. And it's tranquilized and kept behind bars.
 
-Intuition is not mystical. It's a deeper form of intelligence that processes far more information than your conscious mind can hold. It speaks through the body — a gut feeling, a tightness in the chest, a sudden calm. It rarely explains itself. It just knows.
+But it's in there and it's ready to come out. This giant inside of you is meant to make an impact on the world. It's meant to be set free. It's meant to explode with energy on a daily basis.
 
-The challenge is that fear also speaks through the body. So how do you tell the difference?
+When you can awaken this giant, there's nothing that can stop your truest dreams and desires. You become bulletproof. You become the person you could only dream of in the past. Fears and obstacles become just another thing to deal with. They don't cripple you.
 
-Fear is loud, urgent, and repetitive. It says the same thing over and over. It contracts your body. It demands immediate action. It catastrophizes.
-
-Intuition is quiet, clear, and often surprising. It doesn't argue. It states once and waits. It might make you uncomfortable, but it doesn't make you panicked. There's a settledness to it, even when the message is hard.
-
-Phase 3 of the walk — Connecting with Source — is where intuition speaks loudest. When you've already opened your heart, activated your power, and then surrender control, what remains is signal. The noise is gone. What comes through in that silence is worth trusting.
-
-The walk trains you to hear this voice more clearly every day. Not by adding something new, but by removing what was covering it up.`,
+This power is compounding. Next time you go on a walk, you're going to feel it five times more. The next time, ten times more. Then a hundred times more. You're going to get exponentially more powerful every single time you take this walk. When you combine this feeling with love, there is no stopping you from fulfilling your purpose.`,
   },
   {
     id: "identity-repetition",
-    title: "The Power of Repetition",
-    description: "Why the 100th walk matters more than the first",
+    title: "The More You Practice, The Deeper It Gets",
+    description: "Why every single day matters and how the lessons build on each other",
     readTime: "2 min",
-    category: "Identity",
-    content: `Your first Perfect Walk might feel powerful. Or it might feel awkward. It doesn't matter.
+    category: "The Practice",
+    content: `The walk is best done first thing in the morning. Right when you get up, drink some water, maybe a little coffee, and get out of the house before your mind turns on and starts to convince you to do other things.
 
-What matters is that you showed up. And what matters even more is that you show up again tomorrow. And the day after that.
+You set the stage for your day. For who you're going to be that day, for what you're going to feel like, for what you're going to give out to the universe, and for what you're going to receive. You create the energetic code of what your life will become, because everything you feel during this walk will be attracted to you afterwards.
 
-Transformation is not a single moment of insight. It's the compound effect of small, consistent shifts in state. Each walk doesn't need to be transcendent. It needs to happen.
+Do it every single day. The more you do the walk, the deeper your practice becomes, the faster things will change in your life. You'll be able to build on the feelings from your last walk. You'll find the feeling easier and go deeper with more time in it.
 
-Think of it like this: one walk opens a door. Ten walks create a path. A hundred walks become who you are. You stop being someone who does a walking practice and become someone who walks. The practice becomes identity.
+When you look for it and search for it and try, you won't find. But when you let go and be present and follow the cues, you'll find. And if you've done the walk yesterday, it's much easier to find the feeling. So every day is recommended.
 
-This is why Phase 5 — Celebration — matters so much. It encodes the walk as rewarding. Your brain starts associating the practice with joy, pride, and gratitude. Over time, the walk stops feeling like discipline and starts feeling like coming home.
-
-The streak counter in this app isn't a gamification trick. It's a mirror. It shows you who you're becoming through the simple act of showing up. Every morning you walk is a vote for the person you want to be.`,
+The perfect walk is such a simple habit yet so powerful that once you get started, you'll never stop.`,
   },
 ];
 

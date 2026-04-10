@@ -25,8 +25,8 @@ const reflectionQuestions = [
 const fadeSlide = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -20 },
-  transition: { duration: 0.35 },
+  exit: { opacity: 0, y: -12 },
+  transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1] },
 };
 
 const JournalNew = () => {
@@ -351,63 +351,84 @@ const JournalNew = () => {
             </motion.div>
           )}
 
-          {/* Synthesis */}
+          {/* Synthesis — Full-screen immersive moment */}
           {step === "synthesis" && (
-            <motion.div key="synthesis" {...fadeSlide}>
-              <div className="mt-10 text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+            <motion.div
+              key="synthesis"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8 }}
+              className="fixed inset-0 z-50 flex flex-col items-center justify-center px-8"
+              style={{
+                background: "radial-gradient(ellipse at 50% 40%, hsl(32 80% 50% / 0.06) 0%, hsl(var(--background)) 70%)",
+              }}
+            >
+              <div className="flex-1 flex flex-col items-center justify-center max-w-sm">
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.3, type: "spring", stiffness: 150, damping: 20 }}
+                  className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/8 animate-breathe"
+                >
                   <Sparkles className="h-7 w-7 text-primary" />
-                </div>
-                <h2 className="mt-4 font-display text-2xl font-bold text-foreground">
+                </motion.div>
+
+                <motion.h2
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5, duration: 0.6 }}
+                  className="mt-6 font-display text-2xl font-bold text-foreground"
+                >
                   Your Walk Today
-                </h2>
+                </motion.h2>
+
+                <div className="mt-8">
+                  {isSynthesizing && !synthesis ? (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="flex items-center justify-center gap-1.5"
+                    >
+                      {[0, 1, 2].map((i) => (
+                        <motion.div
+                          key={i}
+                          className="h-1.5 w-1.5 rounded-full bg-primary/40"
+                          animate={{ scale: [1, 1.5, 1] }}
+                          transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                        />
+                      ))}
+                    </motion.div>
+                  ) : (
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 1.5 }}
+                      className="font-display text-lg leading-relaxed text-foreground/80 text-center italic"
+                    >
+                      "{synthesis}"
+                    </motion.p>
+                  )}
+                </div>
               </div>
 
-              {/* Synthesis card */}
-              <div className="mt-6 rounded-2xl bg-card p-6 shadow-warm">
-                {isSynthesizing && !synthesis ? (
-                  <div className="flex items-center justify-center gap-2 py-4">
-                    <div className="h-2 w-2 rounded-full bg-primary animate-bounce" />
-                    <div className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:0.1s]" />
-                    <div className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:0.2s]" />
-                  </div>
-                ) : (
-                  <p className="text-sm leading-relaxed text-foreground/90 italic">
-                    "{synthesis}"
-                  </p>
-                )}
-              </div>
-
-              {/* Reflection summary */}
-              <div className="mt-4 space-y-3">
-                {reflectionQuestions.map((q) => {
-                  const answer = answers[q.key as keyof typeof answers];
-                  if (!answer) return null;
-                  return (
-                    <div key={q.key} className="rounded-xl bg-secondary/50 p-4">
-                      <p className="text-xs font-medium text-muted-foreground">{q.question}</p>
-                      <p className="mt-1 text-sm text-foreground">{answer}</p>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-8 flex gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => navigate("/journal")}
-                  className="flex-1 rounded-full"
+              {/* Save button at bottom */}
+              {synthesis && !isSynthesizing && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5, duration: 0.6 }}
+                  className="w-full max-w-sm pb-12"
                 >
-                  Skip
-                </Button>
-                <Button
-                  onClick={handleSave}
-                  className="flex-1 gap-2 rounded-full gradient-sunrise text-primary-foreground shadow-warm"
-                >
-                  <Check className="h-4 w-4" />
-                  Save Reflection
-                </Button>
-              </div>
+                  <Button
+                    onClick={handleSave}
+                    className="w-full gap-2 rounded-full gradient-sunrise text-primary-foreground shadow-glow py-6"
+                    size="lg"
+                  >
+                    <Check className="h-4 w-4" />
+                    Save Reflection
+                  </Button>
+                </motion.div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

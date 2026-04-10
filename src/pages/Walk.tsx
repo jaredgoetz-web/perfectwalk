@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import heartBg from "@/assets/phase-heart-bg.jpg";
-import { Play, Pause, SkipForward, Check, X, ListMusic, Sparkles, ChevronRight, Music2, LogOut } from "lucide-react";
+import { Play, Pause, SkipForward, Check, X, ListMusic, Sparkles, ChevronRight, Music2, LogOut, Volume2, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import WalkPhaseCard, { walkPhases } from "@/components/WalkPhaseCard";
 import { saveWalkEntry, WalkEntry } from "@/lib/walkStore";
@@ -13,7 +13,8 @@ import {
   resetSessionSeed,
   GuidanceMode,
 } from "@/lib/phasePrompts";
-import { useCoachVoice } from "@/hooks/useCoachVoice";
+import { useCoachVoice, getCoachVolume, setCoachVolume } from "@/hooks/useCoachVoice";
+import { phaseColorMap } from "@/lib/motionPresets";
 import SpotifyEmbed from "@/components/SpotifyEmbed";
 import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
 import { isLoggedIn as isSpotifyLoggedIn, loginWithSpotify, logout as spotifyLogout, fetchSpotifyProfile } from "@/lib/spotifyAuth";
@@ -51,10 +52,19 @@ const Walk = () => {
   const [completedPhases, setCompletedPhases] = useState<number[]>([]);
   const [guidanceMode, setGuidanceModeState] = useState<GuidanceMode>(getGuidanceMode());
   const [coachSpeaking, setCoachSpeaking] = useState(false);
+  const [coachVolume, setCoachVolumeState] = useState(getCoachVolume());
+  const [showSettings, setShowSettings] = useState(false);
+  const [phaseTransitioning, setPhaseTransitioning] = useState(false);
+  const [transitionPhase, setTransitionPhase] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const coach = useCoachVoice();
   const spokenPhasesRef = useRef<Set<number>>(new Set());
   const midPhaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Connect music audio element to coach for ducking
+  useEffect(() => {
+    coach.setMusicElement(audioRef.current);
+  }, []);
 
   // Spotify state
   const [spotifyConnected, setSpotifyConnected] = useState(isSpotifyLoggedIn());
@@ -170,6 +180,7 @@ const Walk = () => {
   }, [useSDK, currentPhase]);
 
   // ─── Coach Voice: speak guidance prompts over music ───
+  // Triggers on phase change AND when walking starts (so phase 1 is never missed)
   useEffect(() => {
     if (!isWalking || guidanceMode === "minimal") return;
     const phaseId = walkPhases[currentPhase].id;
@@ -178,7 +189,7 @@ const Walk = () => {
     if (spokenPhasesRef.current.has(phaseId)) return;
     spokenPhasesRef.current.add(phaseId);
 
-    // Build what to say: phase intro + guidance prompt
+    // Build what to say — speak like a voice from deep within
     const phaseName = walkPhases[currentPhase].title;
 
     // Get the primary prompt for this phase
@@ -193,13 +204,20 @@ const Walk = () => {
     }
 
     // Speak after a brief pause to let the phase transition settle
+    const delay = currentPhase === 0 ? 3000 : 2000;
     const speakTimeout = setTimeout(async () => {
-      const intro = currentPhase === 0
-        ? `${phaseName}. ${prompt}`
-        : `Moving into ${phaseName}. ${prompt}`;
+      // Phase 1 gets a warm opening; others get a gentle transition
+      let speech: string;
+      if (currentPhase === 0) {
+        speech = `Let's begin. ${phaseName}. ... ${prompt}`;
+      } else if (currentPhase === walkPhases.length - 1) {
+        speech = `And now... ${phaseName}. ${prompt}`;
+      } else {
+        speech = `${phaseName}. ... ${prompt}`;
+      }
 
       setCoachSpeaking(true);
-      await coach.speak(intro);
+      await coach.speak(speech);
       setCoachSpeaking(false);
 
       // In rich mode, speak a second prompt mid-phase (~90 seconds in)
@@ -211,10 +229,10 @@ const Walk = () => {
             setCoachSpeaking(true);
             await coach.speak(secondPrompt);
             setCoachSpeaking(false);
-          }, 90_000); // 90 seconds into the phase
+          }, 90_000);
         }
       }
-    }, 2000);
+    }, delay);
 
     return () => {
       clearTimeout(speakTimeout);
@@ -251,6 +269,8 @@ const Walk = () => {
   };
 
   const handleStart = () => {
+    // Unlock AudioContext on user gesture so coach voice works
+    coach.warmup();
     if (elapsed === 0) {
       resetSessionSeed(); // new walk = new prompts
       spokenPhasesRef.current.clear(); // reset spoken phases for new walk
@@ -264,7 +284,17 @@ const Walk = () => {
       setCompletedPhases((prev) => [...prev, walkPhases[currentPhase].id]);
     }
     if (currentPhase < walkPhases.length - 1) {
-      setCurrentPhase((p) => p + 1);
+      const nextIdx = currentPhase + 1;
+      // Trigger full-screen transition moment
+      setTransitionPhase(nextIdx);
+      setPhaseTransitioning(true);
+      setTimeout(() => {
+        setCurrentPhase(nextIdx);
+      }, 800);
+      setTimeout(() => {
+        setPhaseTransitioning(false);
+        setTransitionPhase(null);
+      }, 2200);
     }
   }, [currentPhase, completedPhases]);
 
@@ -467,96 +497,127 @@ const Walk = () => {
     );
   }
 
-  // ─── Walking Screen ───
+  // Get current guidance prompt
+  const getPromptText = () => {
+    if (guidanceMode === "minimal") return null;
+    try {
+      const personalized = JSON.parse(localStorage.getItem("tpw_phase_prompts") || "{}");
+      const p = personalized[String(phase.id)];
+      if (p) return p;
+    } catch {}
+    const defaults = getPhaseGuidance(phase.id, "moderate");
+    return defaults[0] || null;
+  };
+
+  const promptText = getPromptText();
+  const phaseHsl = phaseColorMap[phase.id] || "32 80% 50%";
+
+  // ─── Walking Screen — Immersive ───
   return (
-    <div className="min-h-screen pb-24">
+    <div
+      className="fixed inset-0 z-40 flex flex-col overflow-hidden transition-colors duration-1000"
+      style={{
+        background: `radial-gradient(ellipse at 50% 30%, hsl(${phaseHsl} / 0.08) 0%, hsl(var(--background)) 70%)`,
+      }}
+    >
       <audio ref={audioRef} preload="auto" />
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-5">
-        <button onClick={handleCancel} className="rounded-full p-2 text-muted-foreground hover:bg-secondary">
+
+      {/* Phase transition overlay */}
+      <AnimatePresence>
+        {phaseTransitioning && transitionPhase !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center"
+            style={{
+              background: `radial-gradient(ellipse at 50% 50%, hsl(${phaseColorMap[walkPhases[transitionPhase].id] || "32 80% 50%"} / 0.15) 0%, hsl(var(--background)) 70%)`,
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.7, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 150, damping: 18, delay: 0.2 }}
+              className={`flex h-24 w-24 items-center justify-center rounded-full ${walkPhases[transitionPhase].color}`}
+              style={{
+                background: `hsl(${phaseColorMap[walkPhases[transitionPhase].id] || "32 80% 50%"} / 0.12)`,
+                boxShadow: `0 0 60px -4px hsl(${phaseColorMap[walkPhases[transitionPhase].id] || "32 80% 50%"} / 0.4)`,
+              }}
+            >
+              {(() => { const TIcon = walkPhases[transitionPhase].icon; return <TIcon className="h-10 w-10" />; })()}
+            </motion.div>
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+              className="mt-6 font-display text-4xl font-bold text-foreground"
+            >
+              {walkPhases[transitionPhase].title}
+            </motion.h2>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Top bar: close + phase dots + settings */}
+      <div className="relative z-10 flex items-center justify-between px-5 pt-5">
+        <button onClick={handleCancel} className="rounded-full p-2 text-muted-foreground/60 hover:text-muted-foreground">
           <X className="h-5 w-5" />
         </button>
-        <span className="font-display text-lg font-semibold text-foreground">
-          {isWalking ? "Walking" : "Ready"}
-        </span>
+
         <div className="w-9" />
+
+        <button
+          onClick={() => setShowSettings(!showSettings)}
+          className="rounded-full p-2 text-muted-foreground/60 hover:text-muted-foreground"
+        >
+          <Settings2 className="h-5 w-5" />
+        </button>
       </div>
 
-      {/* Timer */}
-      <div className="relative mt-8 flex flex-col items-center overflow-hidden rounded-3xl mx-4 py-8">
-        <img src={heartBg} alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" />
-        <div className="absolute inset-0 bg-background/50" />
+      {/* Main immersive area */}
+      <div className="flex flex-1 flex-col items-center justify-center px-8">
+        {/* Phase icon — large, glowing, breathing */}
         <motion.div
           key={currentPhase}
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className={`relative z-10 flex h-32 w-32 items-center justify-center rounded-full bg-secondary ${phase.color}`}
+          transition={{ type: "spring", stiffness: 160, damping: 18, duration: 0.8 }}
+          className={`flex h-40 w-40 items-center justify-center rounded-full ${phase.color} ${isWalking ? "animate-breathe" : ""}`}
+          style={{
+            background: `hsl(${phaseHsl} / 0.1)`,
+            boxShadow: `0 0 40px -4px hsl(${phaseHsl} / 0.3), 0 0 80px -8px hsl(${phaseHsl} / 0.15)`,
+          }}
         >
-          <Icon className="h-14 w-14" />
+          <Icon className="h-16 w-16" />
         </motion.div>
 
+        {/* Phase name + prompt */}
         <AnimatePresence mode="wait">
           <motion.div
             key={currentPhase}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="relative z-10 mt-6 text-center"
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+            className="mt-8 text-center"
           >
-            <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">
-              Phase {phase.id} of 5
-            </p>
-            <h2 className="mt-1 font-display text-3xl font-bold text-foreground">
+            <h2 className="font-display text-2xl font-bold text-foreground">
               {phase.title}
             </h2>
-            <p className="mt-1 text-muted-foreground">{phase.subtitle}</p>
-            {(() => {
-              if (guidanceMode === "minimal") return null;
-
-              const prompts: string[] = [];
-
-              // Get personalized prompt if available
-              try {
-                const personalized = JSON.parse(localStorage.getItem("tpw_phase_prompts") || "{}");
-                const personalPrompt = personalized[String(phase.id)];
-                if (personalPrompt) prompts.push(personalPrompt);
-              } catch {}
-
-              // Get default guidance prompts
-              const defaults = getPhaseGuidance(phase.id, guidanceMode);
-
-              if (guidanceMode === "moderate") {
-                // Show personalized if available, otherwise 1 default
-                const show = prompts.length > 0 ? prompts : defaults.slice(0, 1);
-                if (show.length === 0) return null;
-                return (
-                  <div className="mt-3 space-y-2 max-w-xs mx-auto">
-                    {show.map((text, i) => (
-                      <p key={i} className="text-sm italic leading-relaxed text-foreground/80">
-                        "{text}"
-                      </p>
-                    ))}
-                  </div>
-                );
-              }
-
-              // Rich: show personalized + defaults (deduplicated)
-              const allPrompts = [...prompts, ...defaults.filter((d) => !prompts.includes(d))].slice(0, 3);
-              if (allPrompts.length === 0) return null;
-              return (
-                <div className="mt-3 space-y-2 max-w-xs mx-auto">
-                  {allPrompts.map((text, i) => (
-                    <p key={i} className="text-sm italic leading-relaxed text-foreground/80">
-                      "{text}"
-                    </p>
-                  ))}
-                </div>
-              );
-            })()}
+            {promptText && guidanceMode !== "minimal" && (
+              <p className="mt-4 max-w-xs mx-auto text-sm italic leading-relaxed text-foreground/60">
+                "{promptText}"
+              </p>
+            )}
           </motion.div>
         </AnimatePresence>
 
-        <p className="relative z-10 mt-6 font-display text-5xl font-bold tabular-nums text-foreground">
+        {/* Timer */}
+        <p
+          className="mt-8 font-display text-6xl font-bold tabular-nums tracking-tight text-foreground/90"
+          style={{ textShadow: "0 2px 16px hsl(25 25% 12% / 0.04)" }}
+        >
           {formatTime(elapsed)}
         </p>
 
@@ -564,143 +625,178 @@ const Walk = () => {
         <AnimatePresence>
           {coachSpeaking && (
             <motion.div
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              className="relative z-10 mt-3 flex items-center justify-center gap-1.5"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="mt-4 flex items-center gap-2"
             >
-              <div className="flex gap-0.5">
+              <div className="flex gap-1">
                 {[0, 1, 2].map((i) => (
                   <motion.div
                     key={i}
-                    className="w-1 rounded-full bg-primary"
-                    animate={{ height: [6, 16, 6] }}
-                    transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
+                    className="h-1.5 w-1.5 rounded-full bg-primary/50"
+                    animate={{ scale: [1, 1.5, 1] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: i * 0.2, ease: "easeInOut" }}
                   />
                 ))}
               </div>
-              <span className="text-xs text-muted-foreground">Coach speaking</span>
+              <span className="text-xs text-muted-foreground/60">Speaking</span>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Controls */}
-      <div className="mt-8 flex items-center justify-center gap-4">
-        {!isWalking && elapsed === 0 ? (
-          <Button
-            size="lg"
-            onClick={handleStart}
-            className="gradient-sunrise gap-2 rounded-full px-10 py-6 text-lg text-primary-foreground shadow-warm"
-          >
-            <Play className="h-5 w-5" />
-            Begin Walk
-          </Button>
-        ) : (
-          <>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={isWalking ? handlePause : handleStart}
-              className="h-14 w-14 rounded-full p-0"
-            >
-              {isWalking ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-            </Button>
-            {currentPhase < walkPhases.length - 1 ? (
+      {/* Controls — pinned to bottom */}
+      <div className="relative z-10 pb-10 pt-4">
+        <div className="flex items-center justify-center gap-5">
+          {!isWalking && elapsed === 0 ? (
+            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
               <Button
                 size="lg"
-                onClick={handleNextPhase}
-                className="gap-2 rounded-full px-6 py-6"
+                onClick={handleStart}
+                className="gradient-sunrise gap-2 rounded-full px-12 py-7 text-lg text-primary-foreground shadow-glow"
               >
-                <SkipForward className="h-4 w-4" />
-                Next Phase
+                <Play className="h-5 w-5" />
+                Begin Walk
               </Button>
-            ) : (
+            </motion.div>
+          ) : (
+            <>
               <Button
                 size="lg"
-                onClick={handleFinish}
-                className="gradient-sunrise gap-2 rounded-full px-6 py-6 text-primary-foreground shadow-warm"
+                variant="outline"
+                onClick={isWalking ? handlePause : handleStart}
+                className="h-14 w-14 rounded-full p-0 border-muted-foreground/20"
               >
-                <Check className="h-4 w-4" />
-                Finish Walk
+                {isWalking ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
               </Button>
-            )}
-          </>
+              {currentPhase < walkPhases.length - 1 ? (
+                <Button
+                  size="lg"
+                  onClick={handleNextPhase}
+                  className="gap-2 rounded-full px-6 py-6"
+                >
+                  <SkipForward className="h-4 w-4" />
+                  Next Phase
+                </Button>
+              ) : (
+                <motion.div whileTap={{ scale: 0.97 }}>
+                  <Button
+                    size="lg"
+                    onClick={handleFinish}
+                    className="gradient-sunrise gap-2 rounded-full px-6 py-6 text-primary-foreground shadow-glow"
+                  >
+                    <Check className="h-4 w-4" />
+                    Finish Walk
+                  </Button>
+                </motion.div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Spotify embed (keep functional but minimal) */}
+        {currentMedia?.type === "spotify" && currentMedia.spotifyTrackId && !useSDK && (
+          <div className="mx-auto mt-4 max-w-sm px-8 rounded-xl overflow-hidden opacity-80">
+            <SpotifyEmbed trackId={currentMedia.spotifyTrackId} compact autoPlay={isWalking} />
+          </div>
         )}
       </div>
 
-      {/* Now playing info / Spotify embed */}
-      {currentMedia && (
-        <div className="mx-auto mt-6 max-w-lg px-5">
-          {useSDK ? (
-            // Full playback via Spotify SDK — show simple now-playing indicator
-            <div className="flex items-center gap-2 rounded-xl bg-card px-4 py-3 shadow-warm">
-              <div className="h-2 w-2 rounded-full bg-[hsl(141,70%,45%)] animate-pulse" />
-              <p className="text-sm text-muted-foreground">
-                Playing via Spotify:{" "}
-                <span className="font-semibold text-foreground">{currentMedia.title}</span>
-              </p>
-            </div>
-          ) : currentMedia.type === "spotify" && currentMedia.spotifyTrackId ? (
-            <div className="rounded-xl overflow-hidden shadow-warm">
-              <SpotifyEmbed trackId={currentMedia.spotifyTrackId} compact={false} autoPlay={isWalking} />
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 rounded-xl bg-card px-4 py-3 shadow-warm">
-              <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-              <p className="text-sm text-muted-foreground">
-                Now playing:{" "}
-                <span className="font-semibold text-foreground">
-                  {currentMedia.title}
-                </span>
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Spotify error */}
-      {spotify.error && (
-        <div className="mx-auto mt-3 max-w-lg px-5">
-          <p className="text-xs text-center text-muted-foreground">{spotify.error}</p>
-        </div>
-      )}
-
-      {/* Guidance mode toggle */}
-      <div className="mx-auto mt-6 max-w-lg px-5">
-        <div className="flex items-center justify-center gap-1 rounded-full bg-secondary/60 p-1">
-          {(["minimal", "moderate", "rich"] as GuidanceMode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => {
-                setGuidanceModeState(mode);
-                setGuidanceMode(mode);
-              }}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium capitalize transition-all ${
-                guidanceMode === mode
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+      {/* Settings drawer overlay */}
+      <AnimatePresence>
+        {showSettings && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowSettings(false)}
+              className="fixed inset-0 z-50 bg-foreground/20"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl bg-card p-6 shadow-elevated"
             >
-              {mode}
-            </button>
-          ))}
-        </div>
-        <p className="mt-1.5 text-center text-[11px] text-muted-foreground">Guidance level</p>
-      </div>
+              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/20" />
+              <p className="font-display text-lg font-semibold text-foreground">Settings</p>
 
-      {/* Phase list */}
-      <div className="mx-auto mt-6 max-w-lg space-y-2 px-5">
-        {walkPhases.map((p, i) => (
-          <WalkPhaseCard
-            key={p.id}
-            phase={p}
-            index={i}
-            isActive={i === currentPhase}
-            onClick={() => isWalking && setCurrentPhase(i)}
-          />
-        ))}
-      </div>
+              {/* Guidance mode */}
+              <div className="mt-5">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Guidance Level</p>
+                <div className="flex gap-2">
+                  {(["minimal", "moderate", "rich"] as GuidanceMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => {
+                        setGuidanceModeState(mode);
+                        setGuidanceMode(mode);
+                      }}
+                      className={`flex-1 rounded-xl py-2.5 text-xs font-medium capitalize transition-all ${
+                        guidanceMode === mode
+                          ? "bg-primary/10 text-primary border border-primary/20"
+                          : "bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Voice volume */}
+              {guidanceMode !== "minimal" && (
+                <div className="mt-5">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Coach Voice Volume</p>
+                  <div className="flex items-center gap-3">
+                    <Volume2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={coachVolume}
+                      onChange={(e) => {
+                        const vol = parseFloat(e.target.value);
+                        setCoachVolumeState(vol);
+                        setCoachVolume(vol);
+                      }}
+                      className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-secondary
+                        [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4
+                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full
+                        [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-sm"
+                    />
+                    <span className="w-8 text-right text-xs text-muted-foreground">
+                      {Math.round(coachVolume * 100)}%
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Now playing */}
+              {currentMedia && (
+                <div className="mt-5">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Now Playing</p>
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    <span className="text-sm text-foreground">{currentMedia.title}</span>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowSettings(false)}
+                className="mt-6 w-full rounded-full bg-secondary py-3 text-sm font-medium text-foreground"
+              >
+                Done
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

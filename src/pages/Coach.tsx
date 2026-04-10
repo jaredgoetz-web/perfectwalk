@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
-import { Send, Trash2, Sparkles } from "lucide-react";
+import { Send, Trash2, Sparkles, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { getDeviceId } from "@/lib/deviceId";
@@ -70,7 +70,7 @@ async function streamChat({
   onDone();
 }
 
-const WELCOME = "Hey there! 👋 I'm your Walk Coach. I'm here to help you get the most out of The Perfect Walk — whether you're just getting started or looking to go deeper. What's on your mind?";
+const WELCOME = "I'm here whenever you need to talk about your practice, your walks, or anything that's on your heart. What's on your mind?";
 
 const Coach = () => {
   const deviceId = getDeviceId();
@@ -79,9 +79,8 @@ const Coach = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load history
   useEffect(() => {
     (async () => {
       const { data } = await supabase
@@ -96,7 +95,6 @@ const Coach = () => {
     })();
   }, [deviceId]);
 
-  // Auto-scroll
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
@@ -160,85 +158,114 @@ const Coach = () => {
   return (
     <div className="flex h-screen flex-col pb-20">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border bg-background/80 px-4 py-3 backdrop-blur-xl">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-            <Sparkles className="h-4 w-4 text-primary" />
-          </div>
-          <div>
-            <h1 className="font-display text-lg font-semibold text-foreground">Walk Coach</h1>
-            <p className="text-xs text-muted-foreground">Your guide to The Perfect Walk</p>
+      <div className="flex items-center justify-between px-5 pt-8 pb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/8 animate-breathe">
+              <Sparkles className="h-4 w-4 text-primary" />
+            </div>
+            <h1 className="font-display text-2xl font-bold text-foreground">Your Coach</h1>
           </div>
         </div>
         {messages.length > 0 && (
-          <Button variant="ghost" size="icon" onClick={clearHistory} title="Clear history">
-            <Trash2 className="h-4 w-4 text-muted-foreground" />
+          <Button variant="ghost" size="icon" onClick={clearHistory} title="Clear history" className="text-muted-foreground/40 hover:text-muted-foreground">
+            <Trash2 className="h-4 w-4" />
           </Button>
         )}
       </div>
 
-      {/* Messages */}
+      {/* Messages — conversation style, not chat bubbles */}
       <ScrollArea className="flex-1" ref={scrollRef as any}>
-        <div className="mx-auto max-w-lg space-y-4 px-4 py-4">
+        <div className="mx-auto max-w-lg px-5 py-4">
           {loadingHistory ? (
             <div className="flex justify-center py-12">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <div className="flex gap-1.5">
+                {[0, 1, 2].map((i) => (
+                  <motion.div
+                    key={i}
+                    className="h-1.5 w-1.5 rounded-full bg-primary/40"
+                    animate={{ scale: [1, 1.5, 1] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                  />
+                ))}
+              </div>
             </div>
           ) : (
-            displayMessages.map((m, i) => (
-              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                    m.role === "user"
-                      ? "bg-primary text-primary-foreground rounded-br-md"
-                      : "bg-card text-card-foreground rounded-bl-md shadow-sm"
-                  }`}
+            <div className="space-y-6">
+              {displayMessages.map((m, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: i < 3 ? i * 0.1 : 0 }}
                 >
                   {m.role === "assistant" ? (
-                    <div className="prose prose-sm max-w-none dark:prose-invert">
-                      <ReactMarkdown>{m.content}</ReactMarkdown>
+                    /* Coach message — serif, full-width, no bubble */
+                    <div className="border-l-2 border-primary/15 pl-4">
+                      <div className="prose prose-sm max-w-none font-display text-foreground/85 leading-relaxed">
+                        <ReactMarkdown>{m.content}</ReactMarkdown>
+                      </div>
                     </div>
                   ) : (
-                    m.content
+                    /* User message — subtly differentiated */
+                    <div className="pl-8">
+                      <p className="text-sm leading-relaxed text-foreground/70">
+                        {m.content}
+                      </p>
+                    </div>
                   )}
-                </div>
-              </div>
-            ))
-          )}
-          {isLoading && messages[messages.length - 1]?.role === "user" && (
-            <div className="flex justify-start">
-              <div className="rounded-2xl rounded-bl-md bg-card px-4 py-3 shadow-sm">
-                <div className="flex gap-1">
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/40" style={{ animationDelay: "0ms" }} />
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/40" style={{ animationDelay: "150ms" }} />
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/40" style={{ animationDelay: "300ms" }} />
-                </div>
-              </div>
+                </motion.div>
+              ))}
+
+              {/* Breathing dots while loading */}
+              <AnimatePresence>
+                {isLoading && messages[messages.length - 1]?.role === "user" && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="border-l-2 border-primary/15 pl-4 py-2"
+                  >
+                    <div className="flex gap-1.5">
+                      {[0, 1, 2].map((i) => (
+                        <motion.div
+                          key={i}
+                          className="h-1.5 w-1.5 rounded-full bg-primary/30"
+                          animate={{ scale: [1, 1.5, 1] }}
+                          transition={{ duration: 1, repeat: Infinity, delay: i * 0.2, ease: "easeInOut" }}
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           )}
         </div>
       </ScrollArea>
 
-      {/* Input */}
-      <div className="border-t border-border bg-background/80 px-4 py-3 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-lg items-end gap-2">
-          <Textarea
-            ref={textareaRef}
+      {/* Input — clean, minimal */}
+      <div className="border-t border-border/30 bg-background px-5 py-4">
+        <div className="mx-auto flex max-w-lg items-center gap-3">
+          <input
+            ref={inputRef}
+            type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask your coach anything..."
-            className="min-h-[44px] max-h-32 resize-none rounded-xl"
-            rows={1}
+            placeholder="Say what's on your mind..."
+            className="flex-1 rounded-full border border-border/50 bg-card px-5 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/30 transition-colors"
           />
-          <Button
-            onClick={send}
-            disabled={!input.trim() || isLoading}
-            size="icon"
-            className="h-11 w-11 shrink-0 rounded-xl"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
+          <motion.div whileTap={{ scale: 0.93 }}>
+            <Button
+              onClick={send}
+              disabled={!input.trim() || isLoading}
+              size="icon"
+              className="h-11 w-11 shrink-0 rounded-full gradient-sunrise text-primary-foreground shadow-warm"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </motion.div>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Heart, Zap, Sparkles, Leaf, PartyPopper, LucideIcon } from "lucide-react";
+import { phaseColorMap } from "@/lib/motionPresets";
 
 export interface WalkPhase {
   id: number;
@@ -62,27 +63,42 @@ interface WalkPhaseCardProps {
 
 const WalkPhaseCard = ({ phase, index, isActive, onClick }: WalkPhaseCardProps) => {
   const Icon = phase.icon;
+  const hsl = phaseColorMap[phase.id] || "32 80% 50%";
 
   return (
     <motion.button
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1, duration: 0.4 }}
+      transition={{ delay: index * 0.12, duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+      whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
+      className={`flex w-full items-center gap-4 rounded-2xl p-5 text-left transition-all duration-300 ${
         isActive
-          ? "bg-primary/10 ring-2 ring-primary/30"
-          : "bg-card hover:bg-secondary"
+          ? "border border-primary/20"
+          : "bg-card card-hover"
       }`}
+      style={
+        isActive
+          ? {
+              background: `hsl(${hsl} / 0.08)`,
+              boxShadow: `0 0 24px -4px hsl(${hsl} / 0.2), 0 0 48px -8px hsl(${hsl} / 0.1)`,
+            }
+          : undefined
+      }
     >
-      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-secondary ${phase.color}`}>
+      <motion.div
+        animate={isActive ? { scale: [1, 1.04, 1] } : { scale: 1 }}
+        transition={isActive ? { duration: 7, repeat: Infinity, ease: "easeInOut" } : {}}
+        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${phase.color}`}
+        style={{ background: `hsl(${hsl} / ${isActive ? 0.15 : 0.08})` }}
+      >
         <Icon className="h-5 w-5" />
-      </div>
+      </motion.div>
       <div className="min-w-0 flex-1">
         <p className="font-display text-lg font-semibold text-foreground">{phase.title}</p>
         <p className="text-sm text-muted-foreground">{phase.subtitle}</p>
       </div>
-      <span className="shrink-0 font-display text-2xl font-bold text-muted-foreground/40">
+      <span className={`shrink-0 font-display text-2xl font-bold ${isActive ? "text-primary/40" : "text-muted-foreground/30"}`}>
         {phase.id}
       </span>
     </motion.button>

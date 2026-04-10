@@ -37,14 +37,14 @@ const Journal = () => {
             </p>
           </motion.div>
         ) : (
-          <div className="mt-6 space-y-3">
+          <div className="mt-6 space-y-4">
             {entries.map((entry, i) => (
               <motion.div
                 key={entry.id}
-                initial={{ opacity: 0, y: 15 }}
+                initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="rounded-xl bg-card p-4 shadow-warm"
+                transition={{ delay: i * 0.12, duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+                className="rounded-2xl bg-card p-5 shadow-warm card-hover"
               >
                 <div className="flex items-center justify-between">
                   <p className="font-display text-lg font-semibold text-foreground">

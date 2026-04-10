@@ -14,7 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text } = await req.json();
+    const { text, style: styleOverride } = await req.json();
     if (!text || typeof text !== "string") {
       return new Response(JSON.stringify({ error: "text is required" }), {
         status: 400,
@@ -39,9 +39,11 @@ serve(async (req) => {
           text,
           model_id: "eleven_multilingual_v2",
           voice_settings: {
-            stability: 0.55,
-            similarity_boost: 1,
-            style: 0,
+            // Coaching mode: low stability = more emotional range,
+            // high style = expressive/passionate, high similarity = voice clarity
+            stability: styleOverride === "coaching" ? 0.25 : 0.55,
+            similarity_boost: styleOverride === "coaching" ? 0.85 : 1,
+            style: styleOverride === "coaching" ? 0.75 : 0,
             use_speaker_boost: true,
           },
         }),
