@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type Step = "welcome" | "language" | "begin";
+type Step = "welcome" | "language-intro" | "language" | "begin";
 
 interface OnboardingFlowProps {
   onComplete: () => void;
@@ -35,7 +35,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
     onComplete();
   };
 
-  const steps: Step[] = ["welcome", "language", "begin"];
+  const steps: Step[] = ["welcome", "language-intro", "language", "begin"];
   const stepIndex = steps.indexOf(step);
 
   return (
@@ -265,7 +265,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                 transition={{ duration: 0.8, delay: 1.0, ease: [0.16, 1, 0.3, 1] }}
               >
                 <motion.button
-                  onClick={() => setStep("language")}
+                  onClick={() => setStep("language-intro")}
                   className="group relative mx-auto flex w-full max-w-xs items-center justify-center overflow-hidden rounded-full px-8 py-4 font-body font-medium tracking-wide"
                   style={{
                     fontSize: "0.95rem",
@@ -292,6 +292,50 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                   <span className="relative z-10">Begin your journey</span>
                   <ArrowRight className="relative z-10 ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
                 </motion.button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* ─── Language Intro ─── */}
+          {step === "language-intro" && (
+            <motion.div key="language-intro" {...fadeSlide} className="space-y-8 text-center">
+              <motion.p
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                className="font-display text-2xl font-bold leading-relaxed text-foreground"
+              >
+                During your walk, you'll connect with something greater than yourself.
+              </motion.p>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.8, delay: 0.6 }}
+                className="text-muted-foreground leading-relaxed"
+              >
+                It's important to understand what language resonates with you when talking about the divine. Everyone has a different word for it.
+              </motion.p>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.8, delay: 1.0 }}
+                className="text-sm text-muted-foreground/70 italic"
+              >
+                Please choose what feels right.
+              </motion.p>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 1.4 }}
+              >
+                <Button
+                  size="lg"
+                  onClick={() => setStep("language")}
+                  className="w-full gap-2 rounded-full gradient-sunrise text-primary-foreground shadow-glow"
+                >
+                  Continue
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
               </motion.div>
             </motion.div>
           )}

@@ -43,8 +43,6 @@ const Index = () => {
         <OnboardingFlow
           onComplete={() => {
             setShowOnboarding(false);
-            // Go straight to walk — no personalization yet
-            navigate("/walk");
           }}
         />
       )}
