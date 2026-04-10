@@ -75,6 +75,12 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-body);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Ensure scrollable pages clear the bottom nav + safe area */
+  .pb-24 {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   h1, h2, h3, h4, h5, h6 {

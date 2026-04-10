@@ -647,7 +647,7 @@ const Walk = () => {
       </div>
 
       {/* Controls — pinned to bottom */}
-      <div className="relative z-10 pb-10 pt-4">
+      <div className="relative z-10 pt-4" style={{ paddingBottom: "max(2.5rem, env(safe-area-inset-bottom, 1.5rem) + 1rem)" }}>
         <div className="flex items-center justify-center gap-5">
           {!isWalking && elapsed === 0 ? (
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>

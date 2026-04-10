@@ -19,8 +19,8 @@ const BottomNav = () => {
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-lg items-center justify-around py-3">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-background/80 backdrop-blur-xl" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+      <div className="mx-auto flex max-w-lg items-center justify-around py-2">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}

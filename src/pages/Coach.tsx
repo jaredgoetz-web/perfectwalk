@@ -245,7 +245,7 @@ const Coach = () => {
       </ScrollArea>
 
       {/* Input — clean, minimal */}
-      <div className="border-t border-border/30 bg-background px-5 py-4">
+      <div className="border-t border-border/30 bg-background px-5 py-4" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0.5rem) + 0.5rem)" }}
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <input
             ref={inputRef}

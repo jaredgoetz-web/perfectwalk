@@ -39,10 +39,10 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   const stepIndex = steps.indexOf(step);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background overflow-y-auto">
       <button
         onClick={handleFinish}
-        className="absolute right-4 top-4 rounded-full p-2 text-muted-foreground/40 hover:text-muted-foreground"
+        className="absolute right-4 top-4 z-20 rounded-full p-2 text-muted-foreground/40 hover:text-muted-foreground"
       >
         <X className="h-5 w-5" />
       </button>
@@ -259,7 +259,8 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
 
               {/* ── Bottom CTA area ── */}
               <motion.div
-                className="relative z-10 w-full px-8 pb-14 pt-4"
+                className="relative z-10 w-full px-8 pt-4"
+                style={{ paddingBottom: "max(3.5rem, env(safe-area-inset-bottom, 2rem) + 1.5rem)" }}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 1.0, ease: [0.16, 1, 0.3, 1] }}
@@ -298,7 +299,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
 
           {/* ─── Language Intro ─── */}
           {step === "language-intro" && (
-            <motion.div key="language-intro" {...fadeSlide} className="space-y-8 text-center">
+            <motion.div key="language-intro" {...fadeSlide} className="space-y-8 text-center pb-8">
               <motion.p
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -342,7 +343,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
 
           {/* ─── Spiritual Language ─── */}
           {step === "language" && (
-            <motion.div key="language" {...fadeSlide} className="space-y-8">
+            <motion.div key="language" {...fadeSlide} className="space-y-8 pb-8">
               <div className="text-center space-y-3">
                 <h2 className="font-display text-3xl font-bold text-foreground">
                   What word feels right for the divine?
@@ -380,7 +381,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
 
           {/* ─── Let's Begin ─── */}
           {step === "begin" && (
-            <motion.div key="begin" {...fadeSlide} className="space-y-8 text-center">
+            <motion.div key="begin" {...fadeSlide} className="space-y-8 text-center pb-8">
               <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full gradient-sunrise shadow-glow animate-breathe">
                 <Sparkles className="h-10 w-10 text-primary-foreground" />
               </div>

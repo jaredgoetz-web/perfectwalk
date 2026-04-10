@@ -417,7 +417,8 @@ const JournalNew = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.5, duration: 0.6 }}
-                  className="w-full max-w-sm pb-12"
+                  className="w-full max-w-sm"
+                  style={{ paddingBottom: "max(3rem, env(safe-area-inset-bottom, 1.5rem) + 1.5rem)" }}
                 >
                   <Button
                     onClick={handleSave}
