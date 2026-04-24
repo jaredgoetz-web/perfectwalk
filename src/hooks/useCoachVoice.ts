@@ -87,7 +87,11 @@ export function useCoachVoice() {
     abortRef.current?.abort();
     abortRef.current = null;
     if (sourceRef.current) {
-      try { sourceRef.current.stop(); } catch {}
+      try {
+        sourceRef.current.stop();
+      } catch (error) {
+        console.debug("Coach source already stopped", error);
+      }
       sourceRef.current.disconnect();
       sourceRef.current = null;
     }

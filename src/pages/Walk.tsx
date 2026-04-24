@@ -5,7 +5,8 @@ import heartBg from "@/assets/phase-heart-bg.jpg";
 import { Play, Pause, SkipForward, Check, X, ListMusic, Sparkles, ChevronRight, Music2, LogOut, Volume2, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import WalkPhaseCard, { walkPhases } from "@/components/WalkPhaseCard";
-import { saveWalkEntry, WalkEntry } from "@/lib/walkStore";
+import { saveWalkEntry, type WalkEntry, useRefreshWalkEntries } from "@/lib/walkStore";
+import { useUserProfile } from "@/lib/userProfileStore";
 import {
   getPhaseGuidance,
   getGuidanceMode,
@@ -45,6 +46,8 @@ type Screen = "pick" | "walking";
 
 const Walk = () => {
   const navigate = useNavigate();
+  const { data: profile } = useUserProfile();
+  const refreshWalkEntries = useRefreshWalkEntries();
   const [screen, setScreen] = useState<Screen>("pick");
   const [isWalking, setIsWalking] = useState(false);
   const [currentPhase, setCurrentPhase] = useState(0);
@@ -193,11 +196,7 @@ const Walk = () => {
     const phaseName = walkPhases[currentPhase].title;
 
     // Get the primary prompt for this phase
-    let prompt = "";
-    try {
-      const personalized = JSON.parse(localStorage.getItem("tpw_phase_prompts") || "{}");
-      prompt = personalized[String(phaseId)] || "";
-    } catch {}
+    let prompt = profile?.phasePrompts?.[String(phaseId)] || "";
     if (!prompt) {
       const defaults = getPhaseGuidance(phaseId, "moderate");
       prompt = defaults[0] || "";
@@ -241,7 +240,7 @@ const Walk = () => {
         midPhaseTimerRef.current = null;
       }
     };
-  }, [currentPhase, isWalking, guidanceMode]);
+  }, [currentPhase, isWalking, guidanceMode, profile?.phasePrompts]);
 
   // Stop coach voice on pause or unmount
   useEffect(() => {
@@ -321,17 +320,17 @@ const Walk = () => {
     };
   }, []);
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     setIsWalking(false);
     spotify.pause();
-    const entry: WalkEntry = {
-      id: Date.now().toString(),
+    const savedEntry = await saveWalkEntry({
+      id: crypto.randomUUID(),
       date: new Date().toISOString(),
       duration: Math.round(elapsed / 60),
       completedPhases: [...completedPhases, walkPhases[currentPhase].id],
-    };
-    saveWalkEntry(entry);
-    navigate(`/journal/new?walkId=${entry.id}`);
+    });
+    refreshWalkEntries();
+    navigate(`/journal/new?walkId=${savedEntry.id}`);
   };
 
   const handleCancel = () => {
@@ -500,11 +499,8 @@ const Walk = () => {
   // Get current guidance prompt
   const getPromptText = () => {
     if (guidanceMode === "minimal") return null;
-    try {
-      const personalized = JSON.parse(localStorage.getItem("tpw_phase_prompts") || "{}");
-      const p = personalized[String(phase.id)];
-      if (p) return p;
-    } catch {}
+    const p = profile?.phasePrompts?.[String(phase.id)];
+    if (p) return p;
     const defaults = getPhaseGuidance(phase.id, "moderate");
     return defaults[0] || null;
   };
@@ -683,7 +679,7 @@ const Walk = () => {
                 <motion.div whileTap={{ scale: 0.97 }}>
                   <Button
                     size="lg"
-                    onClick={handleFinish}
+                    onClick={() => void handleFinish()}
                     className="gradient-sunrise gap-2 rounded-full px-6 py-6 text-primary-foreground shadow-glow"
                   >
                     <Check className="h-4 w-4" />

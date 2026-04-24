@@ -1,75 +1,218 @@
-// Simple localStorage-based store for walk data
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import type { Tables, TablesInsert } from "@/integrations/supabase/types";
+import { getDeviceId } from "@/lib/deviceId";
 
 export interface WalkEntry {
   id: string;
   date: string;
-  duration: number; // minutes
+  duration: number;
   journalEntry?: string;
   mood?: "amazing" | "great" | "good" | "neutral" | "tough";
   completedPhases: number[];
+  reflectionQ1?: string;
+  reflectionQ2?: string;
+  reflectionQ3?: string;
 }
 
 const STORAGE_KEY = "perfect-walk-entries";
+export const WALK_QUERY_KEY = ["walk-entries"] as const;
 
-export const getWalkEntries = (): WalkEntry[] => {
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function ensureWalkEntryId(id: string): string {
+  return isUuid(id) ? id : crypto.randomUUID();
+}
+
+function readLegacyWalkEntries(): WalkEntry[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    return data ? (JSON.parse(data) as WalkEntry[]) : [];
   } catch {
     return [];
   }
-};
+}
 
-export const saveWalkEntry = (entry: WalkEntry) => {
-  const entries = getWalkEntries();
-  entries.push(entry);
+function writeLegacyWalkEntries(entries: WalkEntry[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-};
+}
 
-export const updateWalkEntry = (id: string, updates: Partial<WalkEntry>) => {
-  const entries = getWalkEntries();
-  const index = entries.findIndex((e) => e.id === id);
-  if (index !== -1) {
-    entries[index] = { ...entries[index], ...updates };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+function clearLegacyWalkEntries() {
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+function rowToWalkEntry(row: Tables<"walk_entries">): WalkEntry {
+  return {
+    id: row.id,
+    date: row.date,
+    duration: row.duration_minutes ?? 0,
+    journalEntry: row.journal_entry ?? undefined,
+    mood: (row.mood as WalkEntry["mood"] | null) ?? undefined,
+    completedPhases: row.completed_phases ?? [],
+    reflectionQ1: row.reflection_q1 ?? undefined,
+    reflectionQ2: row.reflection_q2 ?? undefined,
+    reflectionQ3: row.reflection_q3 ?? undefined,
+  };
+}
+
+function walkEntryToRow(entry: WalkEntry, deviceId: string): TablesInsert<"walk_entries"> {
+  return {
+    id: ensureWalkEntryId(entry.id),
+    device_id: deviceId,
+    date: entry.date,
+    duration_minutes: entry.duration,
+    completed_phases: entry.completedPhases,
+    journal_entry: entry.journalEntry ?? null,
+    mood: entry.mood ?? null,
+    reflection_q1: entry.reflectionQ1 ?? null,
+    reflection_q2: entry.reflectionQ2 ?? null,
+    reflection_q3: entry.reflectionQ3 ?? null,
+  };
+}
+
+async function fetchRemoteWalkEntries(deviceId: string): Promise<WalkEntry[]> {
+  const { data, error } = await supabase
+    .from("walk_entries")
+    .select("*")
+    .eq("device_id", deviceId)
+    .order("date", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map(rowToWalkEntry);
+}
+
+export async function migrateLegacyWalkEntries(): Promise<void> {
+  const deviceId = getDeviceId();
+  const legacy = readLegacyWalkEntries();
+  if (legacy.length === 0) return;
+
+  const payload = legacy.map((entry) => walkEntryToRow(entry, deviceId));
+  const { error } = await supabase.from("walk_entries").upsert(payload, { onConflict: "id" });
+
+  if (error) {
+    console.error("Failed to migrate walk entries", error);
+    return;
   }
-};
 
-export const getStreak = (): number => {
-  const entries = getWalkEntries();
+  clearLegacyWalkEntries();
+}
+
+export async function getWalkEntries(): Promise<WalkEntry[]> {
+  const deviceId = getDeviceId();
+
+  try {
+    await migrateLegacyWalkEntries();
+    const remoteEntries = await fetchRemoteWalkEntries(deviceId);
+    writeLegacyWalkEntries(remoteEntries);
+    return remoteEntries;
+  } catch (error) {
+    console.error("Falling back to legacy walk storage", error);
+    return readLegacyWalkEntries().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }
+}
+
+export async function saveWalkEntry(entry: WalkEntry): Promise<WalkEntry> {
+  const normalizedEntry = { ...entry, id: ensureWalkEntryId(entry.id) };
+  const deviceId = getDeviceId();
+  writeLegacyWalkEntries([normalizedEntry, ...readLegacyWalkEntries().filter((existing) => existing.id !== normalizedEntry.id)]);
+
+  const { data, error } = await supabase
+    .from("walk_entries")
+    .upsert(walkEntryToRow(normalizedEntry, deviceId), { onConflict: "id" })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return rowToWalkEntry(data);
+}
+
+export async function updateWalkEntry(id: string, updates: Partial<WalkEntry>): Promise<WalkEntry | null> {
+  const existing = readLegacyWalkEntries();
+  const current = existing.find((entry) => entry.id === id);
+  const merged = current ? { ...current, ...updates } : null;
+  if (merged) {
+    writeLegacyWalkEntries(existing.map((entry) => (entry.id === id ? merged : entry)));
+  }
+
+  const payload: TablesInsert<"walk_entries"> = {
+    id: ensureWalkEntryId(id),
+    device_id: getDeviceId(),
+    date: updates.date ?? current?.date ?? new Date().toISOString(),
+    duration_minutes: updates.duration ?? current?.duration ?? 0,
+    completed_phases: updates.completedPhases ?? current?.completedPhases ?? [],
+    journal_entry: updates.journalEntry ?? current?.journalEntry ?? null,
+    mood: updates.mood ?? current?.mood ?? null,
+    reflection_q1: updates.reflectionQ1 ?? current?.reflectionQ1 ?? null,
+    reflection_q2: updates.reflectionQ2 ?? current?.reflectionQ2 ?? null,
+    reflection_q3: updates.reflectionQ3 ?? current?.reflectionQ3 ?? null,
+  };
+
+  const { data, error } = await supabase
+    .from("walk_entries")
+    .upsert(payload, { onConflict: "id" })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return rowToWalkEntry(data);
+}
+
+export function getStreakFromEntries(entries: WalkEntry[]): number {
   if (entries.length === 0) return 0;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const dates = entries
-    .map((e) => {
-      const d = new Date(e.date);
-      d.setHours(0, 0, 0, 0);
-      return d.getTime();
-    })
-    .sort((a, b) => b - a);
+  const uniqueDates = [
+    ...new Set(
+      entries
+        .map((entry) => {
+          const date = new Date(entry.date);
+          date.setHours(0, 0, 0, 0);
+          return date.getTime();
+        })
+        .sort((a, b) => b - a),
+    ),
+  ];
 
-  const uniqueDates = [...new Set(dates)];
   let streak = 0;
   let checkDate = today.getTime();
 
   for (const date of uniqueDates) {
     if (date === checkDate) {
-      streak++;
+      streak += 1;
       checkDate -= 86400000;
-    } else if (date < checkDate) {
-      break;
+      continue;
     }
+
+    if (date < checkDate) break;
   }
 
   return streak;
-};
+}
 
-export const getTotalWalks = (): number => getWalkEntries().length;
+export function getTotalWalksFromEntries(entries: WalkEntry[]): number {
+  return entries.length;
+}
 
-export const getTotalMinutes = (): number =>
-  getWalkEntries().reduce((sum, e) => sum + e.duration, 0);
+export function getTotalMinutesFromEntries(entries: WalkEntry[]): number {
+  return entries.reduce((sum, entry) => sum + entry.duration, 0);
+}
+
+export function useWalkEntries() {
+  return useQuery({
+    queryKey: WALK_QUERY_KEY,
+    queryFn: getWalkEntries,
+    staleTime: 15_000,
+  });
+}
+
+export function useRefreshWalkEntries() {
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: WALK_QUERY_KEY });
+}
 
 export const moodEmoji: Record<string, string> = {
   amazing: "✨",

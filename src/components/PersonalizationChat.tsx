@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Mic, MicOff, Keyboard, Send, Sparkles, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { getDeviceId } from "@/lib/deviceId";
+import { saveUserProfile } from "@/lib/userProfileStore";
+import type { SpeechRecognitionConstructor, SpeechRecognitionEvent, SpeechRecognitionInstance, SpeechRecognitionErrorEvent } from "@/lib/webSpeech";
 
 interface ChatMessage {
   role: "assistant" | "user";
@@ -76,7 +77,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
   const answersRef = useRef<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const currentAudioUrlRef = useRef<string | null>(null);
   const ttsQueueRef = useRef<string[]>([]);
@@ -230,12 +231,12 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
       return () => clearTimeout(t);
     }
     if (autoListenPending) setAutoListenPending(false);
-  }, [autoListenPending, inputMode, showQuestion, currentQ, isListening, isSpeaking, isGenerating]);
+  }, [autoListenPending, currentQ, inputMode, isGenerating, isListening, isSpeaking, showQuestion, startListening]);
 
   // Start continuous speech recognition — auto-submits after silence
   const startListening = useCallback(() => {
     const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      (window.SpeechRecognition || window.webkitSpeechRecognition) as SpeechRecognitionConstructor | undefined;
     if (!SpeechRecognition) {
       setInputMode("text");
       return;
@@ -250,7 +251,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
     recognition.lang = "en-US";
     transcriptRef.current = "";
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       let finalTranscript = "";
       let interimTranscript = "";
       for (let i = 0; i < event.results.length; i++) {
@@ -292,7 +293,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
       recognitionRef.current = null;
     };
 
-    recognition.onerror = (event: any) => {
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       // "no-speech" is normal — user just didn't say anything yet
       if (event.error !== "no-speech") {
         console.error("Speech error:", event.error);
@@ -400,7 +401,7 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
         generatePrompts(newAnswers);
       }, 600);
     }
-  }, [speakText]);
+  }, [generatePrompts, speakText]);
 
   const handleSend = () => {
     const value = input.trim();
@@ -421,14 +422,15 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
       const prompts = data?.prompts;
       if (!prompts) throw new Error("No prompts returned");
 
-      const deviceId = getDeviceId();
-      await supabase.from("user_personalization").upsert(
-        { device_id: deviceId, answers: finalAnswers, phase_prompts: prompts },
-        { onConflict: "device_id" }
-      );
-
-      localStorage.setItem("tpw_phase_prompts", JSON.stringify(prompts));
-      localStorage.setItem("tpw_personalized", "true");
+      try {
+        await saveUserProfile({
+          personalizationAnswers: finalAnswers,
+          phasePrompts: prompts,
+          personalized: true,
+        });
+      } catch (error) {
+        console.error("Failed to sync personalized profile", error);
+      }
 
       const readyText = "Your walk is ready. Each phase is now crafted just for you. Taking you there now...";
       setMessages((prev) => [...prev, { role: "assistant", text: readyText }]);
@@ -443,8 +445,14 @@ const PersonalizationChat = ({ onComplete, onSkip }: PersonalizationChatProps) =
       console.error("Failed to generate prompts:", err);
       setIsGenerating(false);
 
-      localStorage.setItem("tpw_personalization_answers", JSON.stringify(finalAnswers));
-      localStorage.setItem("tpw_personalized", "true");
+      try {
+        await saveUserProfile({
+          personalizationAnswers: finalAnswers,
+          personalized: true,
+        });
+      } catch (error) {
+        console.error("Failed to sync fallback personalized profile", error);
+      }
 
       const fallbackText = "I saved your info. I'll personalize your prompts next time — for now, let's walk with the standard experience.";
       setMessages((prev) => [...prev, { role: "assistant", text: fallbackText }]);

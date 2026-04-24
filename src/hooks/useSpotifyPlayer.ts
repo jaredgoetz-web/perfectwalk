@@ -1,10 +1,37 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getAccessToken, isLoggedIn } from "@/lib/spotifyAuth";
 
+interface SpotifyPlayerState {
+  position: number;
+  duration: number;
+  paused: boolean;
+  track_window?: {
+    current_track?: {
+      uri?: string;
+    };
+  };
+}
+
+interface SpotifyPlayer {
+  addListener: (event: string, callback: (payload: unknown) => void) => void;
+  connect: () => Promise<boolean>;
+  disconnect: () => void;
+  pause: () => Promise<void>;
+  resume: () => Promise<void>;
+}
+
+interface SpotifySDK {
+  Player: new (options: {
+    name: string;
+    getOAuthToken: (callback: (token: string) => void) => void;
+    volume: number;
+  }) => SpotifyPlayer;
+}
+
 declare global {
   interface Window {
-    Spotify: any;
-    onSpotifyWebPlaybackSDKReady: () => void;
+    Spotify?: SpotifySDK;
+    onSpotifyWebPlaybackSDKReady?: () => void;
   }
 }
 
@@ -24,7 +51,7 @@ export function useSpotifyPlayer(): UseSpotifyPlayerReturn {
   const [isPremium, setIsPremium] = useState(true);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const playerRef = useRef<any>(null);
+  const playerRef = useRef<SpotifyPlayer | null>(null);
   const trackEndCb = useRef<(() => void) | null>(null);
   const prevTrackUri = useRef<string | null>(null);
 
@@ -37,7 +64,6 @@ export function useSpotifyPlayer(): UseSpotifyPlayerReturn {
       const token = await getAccessToken();
       if (!token || cancelled) return;
 
-      // Load SDK script if needed
       if (!window.Spotify) {
         const script = document.createElement("script");
         script.src = "https://sdk.scdn.co/spotify-player.js";
@@ -49,18 +75,19 @@ export function useSpotifyPlayer(): UseSpotifyPlayerReturn {
         });
       }
 
-      if (cancelled) return;
+      if (cancelled || !window.Spotify) return;
 
       const player = new window.Spotify.Player({
         name: "Perfect Walk",
-        getOAuthToken: async (cb: (t: string) => void) => {
-          const t = await getAccessToken();
-          cb(t || "");
+        getOAuthToken: async (callback) => {
+          const refreshedToken = await getAccessToken();
+          callback(refreshedToken || "");
         },
         volume: 0.8,
       });
 
-      player.addListener("ready", ({ device_id }: { device_id: string }) => {
+      player.addListener("ready", (payload) => {
+        const { device_id } = payload as { device_id: string };
         if (cancelled) return;
         setDeviceId(device_id);
         setIsReady(true);
@@ -71,31 +98,38 @@ export function useSpotifyPlayer(): UseSpotifyPlayerReturn {
         setDeviceId(null);
       });
 
-      player.addListener("initialization_error", ({ message }: { message: string }) => {
+      player.addListener("initialization_error", (payload) => {
+        const { message } = payload as { message: string };
         setError(message);
       });
 
-      player.addListener("authentication_error", ({ message }: { message: string }) => {
+      player.addListener("authentication_error", (payload) => {
+        const { message } = payload as { message: string };
         setError(message);
         setIsPremium(false);
       });
 
-      player.addListener("account_error", ({ message }: { message: string }) => {
+      player.addListener("account_error", () => {
         setError("Spotify Premium is required for full playback");
         setIsPremium(false);
       });
 
-      // Detect track end
-      player.addListener("player_state_changed", (state: any) => {
+      player.addListener("player_state_changed", (payload) => {
+        const state = payload as SpotifyPlayerState | null;
         if (!state) return;
         const { position, duration, paused, track_window } = state;
         const currentUri = track_window?.current_track?.uri;
 
-        // Track ended: position 0, paused, and we were playing something
-        if (paused && position === 0 && prevTrackUri.current && currentUri === prevTrackUri.current && duration > 0) {
-          // Could be end-of-track
+        if (
+          paused &&
+          position === 0 &&
+          prevTrackUri.current &&
+          currentUri === prevTrackUri.current &&
+          duration > 0
+        ) {
           trackEndCb.current?.();
         }
+
         if (!paused && currentUri) {
           prevTrackUri.current = currentUri;
         }
@@ -108,7 +142,7 @@ export function useSpotifyPlayer(): UseSpotifyPlayerReturn {
       playerRef.current = player;
     };
 
-    initPlayer();
+    void initPlayer();
 
     return () => {
       cancelled = true;
@@ -136,15 +170,15 @@ export function useSpotifyPlayer(): UseSpotifyPlayerReturn {
         body: JSON.stringify({ uris: [trackUri] }),
       });
     },
-    [deviceId]
+    [deviceId],
   );
 
   const pause = useCallback(() => {
-    playerRef.current?.pause();
+    void playerRef.current?.pause();
   }, []);
 
   const resume = useCallback(() => {
-    playerRef.current?.resume();
+    void playerRef.current?.resume();
   }, []);
 
   const onTrackEnd = useCallback((cb: () => void) => {

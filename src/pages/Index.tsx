@@ -1,35 +1,40 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Play, Flame, Clock, TrendingUp, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import brandingImage from "@/assets/branding.jpg";
-import { getStreak, getTotalWalks, getTotalMinutes, getWalkEntries } from "@/lib/walkStore";
+import { getStreakFromEntries, getTotalMinutesFromEntries, getTotalWalksFromEntries, useWalkEntries } from "@/lib/walkStore";
+import { useUserProfile } from "@/lib/userProfileStore";
 import OnboardingFlow from "@/components/OnboardingFlow";
 import PersonalizationChat from "@/components/PersonalizationChat";
 
 const Index = () => {
   const navigate = useNavigate();
-  const [showOnboarding, setShowOnboarding] = useState(
-    () => !localStorage.getItem("tpw_onboarded")
+  const { data: entries = [] } = useWalkEntries();
+  const { data: profile } = useUserProfile();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showPersonalization, setShowPersonalization] = useState(false);
+
+  const streak = getStreakFromEntries(entries);
+  const totalWalks = getTotalWalksFromEntries(entries);
+  const totalMinutes = getTotalMinutesFromEntries(entries);
+  const isNewUser = totalWalks === 0;
+
+  const lastEntry = useMemo(
+    () => [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0],
+    [entries],
   );
 
-  // Show personalization after first walk (not before)
-  const [showPersonalization, setShowPersonalization] = useState(() => {
-    const hasWalked = getTotalWalks() > 0;
-    const isPersonalized = !!localStorage.getItem("tpw_personalized");
-    return hasWalked && !isPersonalized;
-  });
+  useEffect(() => {
+    if (!profile) return;
+    setShowOnboarding(!profile.onboarded);
+  }, [profile]);
 
-  const streak = getStreak();
-  const totalWalks = getTotalWalks();
-  const totalMinutes = getTotalMinutes();
-  const entries = getWalkEntries();
-  const isNewUser = totalWalks === 0;
-  const futureSelf = localStorage.getItem("tpw_future_self");
-  const lastEntry = entries.sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  )[0];
+  useEffect(() => {
+    if (!profile) return;
+    setShowPersonalization(profile.onboarded && totalWalks > 0 && !profile.personalized);
+  }, [profile, totalWalks]);
 
   const stats = [
     { icon: Flame, label: "Streak", value: `${streak}`, unit: streak === 1 ? "day" : "days" },
@@ -37,16 +42,19 @@ const Index = () => {
     { icon: Clock, label: "Minutes", value: `${totalMinutes}`, unit: "min" },
   ];
 
+  const onboardingOpen = Boolean(profile) && showOnboarding;
+  const personalizationOpen = Boolean(profile) && !onboardingOpen && showPersonalization;
+
   return (
     <div className="min-h-screen pb-24">
-      {showOnboarding && (
+      {onboardingOpen && (
         <OnboardingFlow
           onComplete={() => {
             setShowOnboarding(false);
           }}
         />
       )}
-      {showPersonalization && (
+      {personalizationOpen && (
         <PersonalizationChat
           onComplete={() => {
             setShowPersonalization(false);
@@ -56,14 +64,9 @@ const Index = () => {
       )}
 
       {isNewUser ? (
-        /* ─── New User Home ─── */
         <>
           <div className="relative overflow-hidden">
-            <img
-              src={brandingImage}
-              alt="The Perfect Walk"
-              className="h-auto w-full object-cover"
-            />
+            <img src={brandingImage} alt="The Perfect Walk" className="h-auto w-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
           </div>
 
@@ -74,9 +77,7 @@ const Index = () => {
               transition={{ duration: 0.8, delay: 0.3, ease: [0.4, 0, 0.2, 1] }}
               className="rounded-3xl bg-card p-8 shadow-elevated text-center"
             >
-              <h2 className="font-display text-2xl font-bold text-foreground">
-                Your first walk is waiting.
-              </h2>
+              <h2 className="font-display text-2xl font-bold text-foreground">Your first walk is waiting.</h2>
               <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
                 25 minutes that will change how your whole day feels. Get out before your mind turns on.
               </p>
@@ -95,14 +96,9 @@ const Index = () => {
           </div>
         </>
       ) : (
-        /* ─── Returning User Home ─── */
         <>
           <div className="relative overflow-hidden">
-            <img
-              src={brandingImage}
-              alt="The Perfect Walk"
-              className="h-auto w-full object-cover"
-            />
+            <img src={brandingImage} alt="The Perfect Walk" className="h-auto w-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
             <motion.div
               initial={{ opacity: 0, y: 16 }}
@@ -124,8 +120,7 @@ const Index = () => {
             </motion.div>
           </div>
 
-          {/* Future self statement */}
-          {futureSelf && (
+          {profile?.futureSelf && (
             <div className="mx-auto -mt-3 max-w-lg px-5">
               <motion.div
                 initial={{ opacity: 0 }}
@@ -134,14 +129,13 @@ const Index = () => {
                 className="text-center py-4"
               >
                 <p className="font-display text-base italic text-foreground/70 leading-relaxed">
-                  "{futureSelf}"
+                  "{profile.futureSelf}"
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">Day {totalWalks} of your practice</p>
               </motion.div>
             </div>
           )}
 
-          {/* Stats */}
           <div className="mx-auto max-w-lg px-5 mt-2">
             <div className="grid grid-cols-3 gap-3">
               {stats.map(({ icon: Icon, label, value, unit }, i) => (
@@ -160,7 +154,6 @@ const Index = () => {
             </div>
           </div>
 
-          {/* Yesterday's truth */}
           {lastEntry?.journalEntry && (
             <motion.div
               initial={{ opacity: 0, y: 12 }}
@@ -173,14 +166,11 @@ const Index = () => {
                 <p className="mt-2 text-sm italic leading-relaxed text-foreground/80">
                   "{lastEntry.journalEntry}"
                 </p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  What opens today?
-                </p>
+                <p className="mt-2 text-xs text-muted-foreground">What opens today?</p>
               </div>
             </motion.div>
           )}
 
-          {/* Coach nudge for streak */}
           {streak >= 3 && (
             <motion.div
               initial={{ opacity: 0, y: 12 }}
@@ -190,9 +180,7 @@ const Index = () => {
             >
               <div className="flex items-start gap-3 rounded-2xl bg-primary/5 p-4">
                 <Sparkles className="h-4 w-4 shrink-0 text-primary mt-0.5" />
-                <p className="text-sm text-foreground/80">
-                  {streak} days straight. The practice is becoming who you are.
-                </p>
+                <p className="text-sm text-foreground/80">{streak} days straight. The practice is becoming who you are.</p>
               </div>
             </motion.div>
           )}

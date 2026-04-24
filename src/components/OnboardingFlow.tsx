@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { saveUserProfile } from "@/lib/userProfileStore";
 
 type Step = "welcome" | "language-intro" | "language" | "begin";
 
@@ -29,9 +30,15 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   const [step, setStep] = useState<Step>("welcome");
   const [language, setLanguage] = useState("");
 
-  const handleFinish = () => {
-    localStorage.setItem("tpw_spiritual_language", language || "Truth");
-    localStorage.setItem("tpw_onboarded", "true");
+  const handleFinish = async () => {
+    try {
+      await saveUserProfile({
+        spiritualLanguage: language || "Truth",
+        onboarded: true,
+      });
+    } catch (error) {
+      console.error("Failed to sync onboarding profile", error);
+    }
     onComplete();
   };
 
@@ -41,7 +48,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background overflow-y-auto">
       <button
-        onClick={handleFinish}
+        onClick={() => void handleFinish()}
         className="absolute right-4 top-4 z-20 rounded-full p-2 text-muted-foreground/40 hover:text-muted-foreground"
       >
         <X className="h-5 w-5" />
@@ -395,7 +402,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
               </div>
               <Button
                 size="lg"
-                onClick={handleFinish}
+                onClick={() => void handleFinish()}
                 className="w-full gap-2 rounded-full gradient-sunrise text-primary-foreground shadow-glow"
               >
                 Start My First Walk

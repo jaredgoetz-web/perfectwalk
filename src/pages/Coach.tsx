@@ -135,9 +135,10 @@ const Coach = () => {
           if (assistantSoFar) await persistMessage("assistant", assistantSoFar);
         },
       });
-    } catch (e: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
       setIsLoading(false);
-      toast({ title: "Coach Error", description: e.message, variant: "destructive" });
+      toast({ title: "Coach Error", description: message, variant: "destructive" });
     }
   };
 
@@ -175,7 +176,7 @@ const Coach = () => {
       </div>
 
       {/* Messages — conversation style, not chat bubbles */}
-      <ScrollArea className="flex-1" ref={scrollRef as any}>
+      <ScrollArea className="flex-1">
         <div className="mx-auto max-w-lg px-5 py-4">
           {loadingHistory ? (
             <div className="flex justify-center py-12">

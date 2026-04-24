@@ -13,7 +13,7 @@ serve(async (req) => {
 
   try {
     const formData = await req.formData();
-    const audioFile = formData.get("audio") as File;
+    const audioFile = formData.get("audio") as File | null;
 
     if (!audioFile) {
       return new Response(JSON.stringify({ error: "audio file is required" }), {
@@ -22,8 +22,8 @@ serve(async (req) => {
       });
     }
 
-    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
-    if (!ELEVENLABS_API_KEY) {
+    const elevenLabsApiKey = Deno.env.get("ELEVENLABS_API_KEY");
+    if (!elevenLabsApiKey) {
       throw new Error("ELEVENLABS_API_KEY is not configured");
     }
 
@@ -35,14 +35,14 @@ serve(async (req) => {
     const response = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
       method: "POST",
       headers: {
-        "xi-api-key": ELEVENLABS_API_KEY,
+        "xi-api-key": elevenLabsApiKey,
       },
       body: apiFormData,
     });
 
     if (!response.ok) {
-      const t = await response.text();
-      console.error("ElevenLabs STT error:", response.status, t);
+      const text = await response.text();
+      console.error("ElevenLabs STT error:", response.status, text);
       return new Response(JSON.stringify({ error: "Transcription failed" }), {
         status: response.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -54,11 +54,11 @@ serve(async (req) => {
     return new Response(JSON.stringify({ text: transcription.text }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (e) {
-    console.error("elevenlabs-stt error:", e);
+  } catch (error) {
+    console.error("elevenlabs-stt error:", error);
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
