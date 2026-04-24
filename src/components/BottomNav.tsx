@@ -13,8 +13,9 @@ const navItems = [
 const BottomNav = () => {
   const location = useLocation();
 
-  // Hide nav during walk and post-walk reflection
-  if (location.pathname === "/walk" || location.pathname === "/journal/new") {
+  const hiddenPaths = new Set(["/walk", "/journal/new", "/auth", "/auth/callback"]);
+
+  if (hiddenPaths.has(location.pathname)) {
     return null;
   }
 

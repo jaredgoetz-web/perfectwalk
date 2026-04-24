@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/auth";
 import { getDeviceId } from "@/lib/deviceId";
 
 export interface UserProfileState {
@@ -10,6 +11,11 @@ export interface UserProfileState {
   completedPhases: number[];
   phasePrompts: Record<string, string>;
   personalizationAnswers: Record<string, string>;
+}
+
+interface StorageIdentity {
+  userId: string | null;
+  deviceId: string;
 }
 
 const DEFAULT_PROFILE: UserProfileState = {
@@ -110,22 +116,50 @@ function normalizeRemoteProfile(payload: Record<string, unknown> | null | undefi
   };
 }
 
-async function fetchRemoteProfile(): Promise<UserProfileState | null> {
-  const deviceId = getDeviceId();
-  const { data, error } = await supabase
+async function getStorageIdentity(): Promise<StorageIdentity> {
+  return {
+    userId: await getCurrentUserId(),
+    deviceId: getDeviceId(),
+  };
+}
+
+function buildProfileRow(profile: UserProfileState, identity: StorageIdentity) {
+  return {
+    user_id: identity.userId,
+    device_id: identity.deviceId,
+    answers: {
+      onboarded: profile.onboarded,
+      personalized: profile.personalized,
+      spiritualLanguage: profile.spiritualLanguage,
+      futureSelf: profile.futureSelf,
+      completedPhases: profile.completedPhases,
+      phasePrompts: profile.phasePrompts,
+      personalizationAnswers: profile.personalizationAnswers,
+    },
+    phase_prompts: profile.phasePrompts,
+  };
+}
+
+async function fetchRemoteProfile(identity: StorageIdentity): Promise<UserProfileState | null> {
+  let query = supabase
     .from("user_personalization")
-    .select("answers, phase_prompts")
-    .eq("device_id", deviceId)
-    .maybeSingle();
+    .select("answers, phase_prompts");
+
+  query = identity.userId ? query.eq("user_id", identity.userId) : query.eq("device_id", identity.deviceId);
+
+  const { data, error } = await query.maybeSingle();
 
   if (error) throw error;
+  if (!data) return null;
+
   return normalizeRemoteProfile({
-    ...((data?.answers as Record<string, unknown> | null | undefined) ?? {}),
-    phase_prompts: data?.phase_prompts ?? undefined,
+    ...((data.answers as Record<string, unknown> | null | undefined) ?? {}),
+    phase_prompts: data.phase_prompts ?? undefined,
   });
 }
 
 export async function migrateLegacyProfile(): Promise<void> {
+  const identity = await getStorageIdentity();
   const legacy = readLegacyProfile();
   const hasLegacyData =
     legacy.onboarded ||
@@ -137,13 +171,19 @@ export async function migrateLegacyProfile(): Promise<void> {
     legacy.spiritualLanguage !== DEFAULT_PROFILE.spiritualLanguage;
 
   if (!hasLegacyData) return;
-  await saveUserProfile(legacy);
+
+  const { error } = await supabase
+    .from("user_personalization")
+    .upsert(buildProfileRow(legacy, identity), { onConflict: identity.userId ? "user_id" : "device_id" });
+
+  if (error) throw error;
 }
 
 export async function getUserProfile(): Promise<UserProfileState> {
   try {
+    const identity = await getStorageIdentity();
     await migrateLegacyProfile();
-    const remote = await fetchRemoteProfile();
+    const remote = await fetchRemoteProfile(identity);
     const profile = remote ?? readLegacyProfile();
     writeLegacyProfile(profile);
     return profile;
@@ -154,29 +194,18 @@ export async function getUserProfile(): Promise<UserProfileState> {
 }
 
 export async function saveUserProfile(updates: Partial<UserProfileState>): Promise<UserProfileState> {
+  const identity = await getStorageIdentity();
+  const existing = (await fetchRemoteProfile(identity)) ?? readLegacyProfile();
   const merged = {
-    ...(await getUserProfile()),
+    ...existing,
     ...updates,
   };
 
   writeLegacyProfile(merged);
 
-  const { error } = await supabase.from("user_personalization").upsert(
-    {
-      device_id: getDeviceId(),
-      answers: {
-        onboarded: merged.onboarded,
-        personalized: merged.personalized,
-        spiritualLanguage: merged.spiritualLanguage,
-        futureSelf: merged.futureSelf,
-        completedPhases: merged.completedPhases,
-        phasePrompts: merged.phasePrompts,
-        personalizationAnswers: merged.personalizationAnswers,
-      },
-      phase_prompts: merged.phasePrompts,
-    },
-    { onConflict: "device_id" },
-  );
+  const { error } = await supabase
+    .from("user_personalization")
+    .upsert(buildProfileRow(merged, identity), { onConflict: identity.userId ? "user_id" : "device_id" });
 
   if (error) throw error;
   return merged;

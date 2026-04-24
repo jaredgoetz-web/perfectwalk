@@ -58,9 +58,22 @@ serve(async (req) => {
   try {
     const { messages, deviceId } = await req.json();
 
-    if (!deviceId || !messages?.length) {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    let userId: string | null = null;
+
+    if (bearerToken) {
+      const { data: authUser } = await supabase.auth.getUser(bearerToken);
+      userId = authUser.user?.id ?? null;
+    }
+
+    if (!messages?.length || (!userId && !deviceId)) {
       return new Response(
-        JSON.stringify({ error: "Missing deviceId or messages" }),
+        JSON.stringify({ error: "Missing authenticated user or deviceId, or messages" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -70,18 +83,14 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Fetch user personalization for context
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
     // Fetch user personalization
     let personalizationContext = "";
-    const { data: personalization } = await supabase
+    const personalizationQuery = supabase
       .from("user_personalization")
-      .select("answers, phase_prompts")
-      .eq("device_id", deviceId)
-      .maybeSingle();
+      .select("answers, phase_prompts");
+    const { data: personalization } = await (userId
+      ? personalizationQuery.eq("user_id", userId)
+      : personalizationQuery.eq("device_id", deviceId)).maybeSingle();
 
     if (personalization?.answers) {
       const a = personalization.answers as Record<string, string>;
@@ -99,10 +108,12 @@ serve(async (req) => {
     // Fetch walk history context from walk_entries (if table exists)
     let walkContext = "";
     try {
-      const { data: walkEntries } = await supabase
+      const walkEntriesQuery = supabase
         .from("walk_entries")
-        .select("date, duration_minutes, completed_phases, reflection_q1, reflection_q2, reflection_q3")
-        .eq("device_id", deviceId)
+        .select("date, duration_minutes, completed_phases, reflection_q1, reflection_q2, reflection_q3");
+      const { data: walkEntries } = await (userId
+        ? walkEntriesQuery.eq("user_id", userId)
+        : walkEntriesQuery.eq("device_id", deviceId))
         .order("created_at", { ascending: false })
         .limit(10);
 

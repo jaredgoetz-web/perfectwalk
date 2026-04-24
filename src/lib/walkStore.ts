@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
+import { getCurrentUserId } from "@/lib/auth";
 import { getDeviceId } from "@/lib/deviceId";
 
 export interface WalkEntry {
@@ -13,6 +14,11 @@ export interface WalkEntry {
   reflectionQ1?: string;
   reflectionQ2?: string;
   reflectionQ3?: string;
+}
+
+interface StorageIdentity {
+  userId: string | null;
+  deviceId: string;
 }
 
 const STORAGE_KEY = "perfect-walk-entries";
@@ -57,10 +63,18 @@ function rowToWalkEntry(row: Tables<"walk_entries">): WalkEntry {
   };
 }
 
-function walkEntryToRow(entry: WalkEntry, deviceId: string): TablesInsert<"walk_entries"> {
+async function getStorageIdentity(): Promise<StorageIdentity> {
+  return {
+    userId: await getCurrentUserId(),
+    deviceId: getDeviceId(),
+  };
+}
+
+function walkEntryToRow(entry: WalkEntry, identity: StorageIdentity): TablesInsert<"walk_entries"> {
   return {
     id: ensureWalkEntryId(entry.id),
-    device_id: deviceId,
+    user_id: identity.userId,
+    device_id: identity.deviceId,
     date: entry.date,
     duration_minutes: entry.duration,
     completed_phases: entry.completedPhases,
@@ -72,23 +86,25 @@ function walkEntryToRow(entry: WalkEntry, deviceId: string): TablesInsert<"walk_
   };
 }
 
-async function fetchRemoteWalkEntries(deviceId: string): Promise<WalkEntry[]> {
-  const { data, error } = await supabase
+async function fetchRemoteWalkEntries(identity: StorageIdentity): Promise<WalkEntry[]> {
+  let query = supabase
     .from("walk_entries")
-    .select("*")
-    .eq("device_id", deviceId)
-    .order("date", { ascending: false });
+    .select("*");
+
+  query = identity.userId ? query.eq("user_id", identity.userId) : query.eq("device_id", identity.deviceId);
+
+  const { data, error } = await query.order("date", { ascending: false });
 
   if (error) throw error;
   return (data ?? []).map(rowToWalkEntry);
 }
 
 export async function migrateLegacyWalkEntries(): Promise<void> {
-  const deviceId = getDeviceId();
+  const identity = await getStorageIdentity();
   const legacy = readLegacyWalkEntries();
   if (legacy.length === 0) return;
 
-  const payload = legacy.map((entry) => walkEntryToRow(entry, deviceId));
+  const payload = legacy.map((entry) => walkEntryToRow(entry, identity));
   const { error } = await supabase.from("walk_entries").upsert(payload, { onConflict: "id" });
 
   if (error) {
@@ -100,11 +116,10 @@ export async function migrateLegacyWalkEntries(): Promise<void> {
 }
 
 export async function getWalkEntries(): Promise<WalkEntry[]> {
-  const deviceId = getDeviceId();
-
   try {
+    const identity = await getStorageIdentity();
     await migrateLegacyWalkEntries();
-    const remoteEntries = await fetchRemoteWalkEntries(deviceId);
+    const remoteEntries = await fetchRemoteWalkEntries(identity);
     writeLegacyWalkEntries(remoteEntries);
     return remoteEntries;
   } catch (error) {
@@ -114,13 +129,13 @@ export async function getWalkEntries(): Promise<WalkEntry[]> {
 }
 
 export async function saveWalkEntry(entry: WalkEntry): Promise<WalkEntry> {
+  const identity = await getStorageIdentity();
   const normalizedEntry = { ...entry, id: ensureWalkEntryId(entry.id) };
-  const deviceId = getDeviceId();
   writeLegacyWalkEntries([normalizedEntry, ...readLegacyWalkEntries().filter((existing) => existing.id !== normalizedEntry.id)]);
 
   const { data, error } = await supabase
     .from("walk_entries")
-    .upsert(walkEntryToRow(normalizedEntry, deviceId), { onConflict: "id" })
+    .upsert(walkEntryToRow(normalizedEntry, identity), { onConflict: "id" })
     .select("*")
     .single();
 
@@ -129,6 +144,7 @@ export async function saveWalkEntry(entry: WalkEntry): Promise<WalkEntry> {
 }
 
 export async function updateWalkEntry(id: string, updates: Partial<WalkEntry>): Promise<WalkEntry | null> {
+  const identity = await getStorageIdentity();
   const existing = readLegacyWalkEntries();
   const current = existing.find((entry) => entry.id === id);
   const merged = current ? { ...current, ...updates } : null;
@@ -138,7 +154,8 @@ export async function updateWalkEntry(id: string, updates: Partial<WalkEntry>): 
 
   const payload: TablesInsert<"walk_entries"> = {
     id: ensureWalkEntryId(id),
-    device_id: getDeviceId(),
+    user_id: identity.userId,
+    device_id: identity.deviceId,
     date: updates.date ?? current?.date ?? new Date().toISOString(),
     duration_minutes: updates.duration ?? current?.duration ?? 0,
     completed_phases: updates.completedPhases ?? current?.completedPhases ?? [],

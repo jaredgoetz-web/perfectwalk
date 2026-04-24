@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { updateWalkEntry, useRefreshWalkEntries } from "@/lib/walkStore";
 import { getDeviceId } from "@/lib/deviceId";
+import { useAuth } from "@/lib/auth";
 import type { SpeechRecognitionEvent, SpeechRecognitionInstance, SpeechRecognitionConstructor } from "@/lib/webSpeech";
 
 const moods = [
@@ -32,6 +33,7 @@ const fadeSlide = {
 const fallbackSynthesis = "You showed up today and that matters. Take what opened and carry it forward.";
 
 const JournalNew = () => {
+  const { session } = useAuth();
   const navigate = useNavigate();
   const refreshWalkEntries = useRefreshWalkEntries();
   const [searchParams] = useSearchParams();
@@ -111,7 +113,8 @@ const JournalNew = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
           deviceId: getDeviceId(),

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { getDeviceId } from "@/lib/deviceId";
+import { useAuth } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -14,12 +15,14 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/walk-coach`;
 
 async function streamChat({
   messages,
+  accessToken,
   deviceId,
   onDelta,
   onDone,
 }: {
   messages: Msg[];
-  deviceId: string;
+  accessToken: string | null;
+  deviceId?: string;
   onDelta: (t: string) => void;
   onDone: () => void;
 }) {
@@ -27,9 +30,10 @@ async function streamChat({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${accessToken ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ messages, deviceId }),
+    body: JSON.stringify({ messages, ...(deviceId ? { deviceId } : {}) }),
   });
 
   if (!resp.ok) {
@@ -73,6 +77,7 @@ async function streamChat({
 const WELCOME = "I'm here whenever you need to talk about your practice, your walks, or anything that's on your heart. What's on your mind?";
 
 const Coach = () => {
+  const { session, user } = useAuth();
   const deviceId = getDeviceId();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -82,25 +87,28 @@ const Coach = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (!user) return;
+
     (async () => {
       const { data } = await supabase
         .from("coach_messages")
         .select("role, content")
-        .eq("device_id", deviceId)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: true });
       if (data?.length) {
         setMessages(data.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })));
       }
       setLoadingHistory(false);
     })();
-  }, [deviceId]);
+  }, [user]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
   const persistMessage = async (role: string, content: string) => {
-    await supabase.from("coach_messages").insert({ device_id: deviceId, role, content });
+    if (!user) return;
+    await supabase.from("coach_messages").insert({ user_id: user.id, device_id: deviceId, role, content });
   };
 
   const send = async () => {
@@ -128,6 +136,7 @@ const Coach = () => {
     try {
       await streamChat({
         messages: [...messages, userMsg],
+        accessToken: session?.access_token ?? null,
         deviceId,
         onDelta: upsert,
         onDone: async () => {
@@ -143,7 +152,8 @@ const Coach = () => {
   };
 
   const clearHistory = async () => {
-    await supabase.from("coach_messages").delete().eq("device_id", deviceId);
+    if (!user) return;
+    await supabase.from("coach_messages").delete().eq("user_id", user.id);
     setMessages([]);
   };
 

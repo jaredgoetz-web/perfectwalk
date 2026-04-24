@@ -11,6 +11,7 @@ import {
   Edit3,
   Check,
   X,
+  LogOut,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -20,9 +21,11 @@ import {
   useWalkEntries,
 } from "@/lib/walkStore";
 import { saveUserProfile, useRefreshUserProfile, useUserProfile } from "@/lib/userProfileStore";
+import { useAuth } from "@/lib/auth";
 
 const You = () => {
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const { data: entries = [] } = useWalkEntries();
   const { data: profile } = useUserProfile();
   const refreshProfile = useRefreshUserProfile();
@@ -171,6 +174,20 @@ const You = () => {
           transition={{ delay: 0.7, duration: 0.5 }}
           className="mt-10 space-y-2"
         >
+          {user && (
+            <div className="rounded-2xl bg-card p-4 shadow-soft">
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Account</p>
+              <p className="mt-2 text-sm text-foreground/80">{user.email ?? user.phone ?? "Signed in"}</p>
+              <button
+                onClick={() => void signOut()}
+                className="mt-4 inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-foreground transition hover:border-primary/30 hover:text-primary"
+              >
+                <LogOut className="h-4 w-4" />
+                Log out
+              </button>
+            </div>
+          )}
+
           {[
             { icon: BarChart3, label: "Detailed Stats", to: "/stats" },
             { icon: Headphones, label: "Learn", to: "/learn" },

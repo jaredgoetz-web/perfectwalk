@@ -21,6 +21,7 @@ export type Database = {
           device_id: string
           id: string
           role: string
+          user_id: string | null
         }
         Insert: {
           content: string
@@ -28,6 +29,7 @@ export type Database = {
           device_id: string
           id?: string
           role: string
+          user_id?: string | null
         }
         Update: {
           content?: string
@@ -35,6 +37,7 @@ export type Database = {
           device_id?: string
           id?: string
           role?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -46,6 +49,7 @@ export type Database = {
           id: string
           phase_prompts: Json
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           answers?: Json
@@ -54,6 +58,7 @@ export type Database = {
           id?: string
           phase_prompts?: Json
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           answers?: Json
@@ -62,42 +67,52 @@ export type Database = {
           id?: string
           phase_prompts?: Json
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
       walk_entries: {
         Row: {
+          completed_phases: number[] | null
           created_at: string
           date: string
           device_id: string
           duration_minutes: number | null
           id: string
+          journal_entry: string | null
           mood: string | null
           reflection_q1: string | null
           reflection_q2: string | null
           reflection_q3: string | null
+          user_id: string | null
         }
         Insert: {
+          completed_phases?: number[] | null
           created_at?: string
           date?: string
           device_id: string
           duration_minutes?: number | null
           id?: string
+          journal_entry?: string | null
           mood?: string | null
           reflection_q1?: string | null
           reflection_q2?: string | null
           reflection_q3?: string | null
+          user_id?: string | null
         }
         Update: {
+          completed_phases?: number[] | null
           created_at?: string
           date?: string
           device_id?: string
           duration_minutes?: number | null
           id?: string
+          journal_entry?: string | null
           mood?: string | null
           reflection_q1?: string | null
           reflection_q2?: string | null
           reflection_q3?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
